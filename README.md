@@ -27,4 +27,4 @@ This project is licensed under the terms of the GNU General Public License v3.0.
 
 ## Credits
 - [Paxsenix](https://github.com/Paxsenix0) for the lyrics API
-- [Spikerko](https://github.com/Spikerko) for the "Spicy Lyrics" extension
+- [Spikerko](https://github.com/spikerko) for the [Spicy Lyrics](https://github.com/spikerko/spicy-lyrics) extension

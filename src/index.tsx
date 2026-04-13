@@ -171,7 +171,12 @@ const App = () => {
                 log(`Direct ISRC lookup: ${isrc}`);
                 try {
                     const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
-                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Spicetify/1.0 (https://github.com/spicetify/spicetify-cli)' });
+                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
+                    
+                    if (res?.message || res?.error) {
+                        log(`AM Search Error: ${res.message || res.error}`, "error");
+                    }
+
                     let arr = res?.results || res?.data || res?.items;
                     if (Array.isArray(res)) arr = res;
                     if (arr && arr.length > 0) {
@@ -179,7 +184,7 @@ const App = () => {
                         log(`Match found via ISRC: ${amId} (${arr[0].name})`, "success");
                     }
                 } catch (e) {
-                    log("ISRC search failed or blocked.", "warn");
+                    log(`ISRC Search Exception: ${e}`, "warn");
                 }
             }
 
@@ -207,11 +212,14 @@ const App = () => {
                 const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
                 let searchRes;
                 try { 
-                    searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                    searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
                 } catch (e) {
                     log("Fuzzy Search fetch failed.", "error");
                 }
                 
+                if (searchRes?.message || searchRes?.error) {
+                    log(`Fuzzy Search Error: ${searchRes.message || searchRes.error}`, "error");
+                }
                 log(`Search Response keys: ${searchRes ? Object.keys(searchRes).join(", ") : "null"}`);
                 let arr = searchRes?.results || searchRes?.data || searchRes?.items;
                 if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
@@ -243,7 +251,7 @@ const App = () => {
                 };
 
                 try {
-                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Spicetify/1.0 (https://github.com/spicetify/spicetify-cli)' });
+                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
                     text = typeof res === 'string' ? res : (res.ttml || res.lyrics || res.data?.lyrics || JSON.stringify(res));
                     text = processAmResponse(text);
                 } catch (e) {
