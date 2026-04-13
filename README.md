@@ -1,6 +1,6 @@
 # Vapor Lyrics
 
-A Spicetify extension for vaporwave-styled lyrics, built with **Bun**.
+A Spicetify extension for cool-ass lyrics, built with **Bun**.
 
 ## Development
 This project uses Bun for bundling and TypeScript for development.
