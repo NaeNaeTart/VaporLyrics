@@ -161,25 +161,42 @@ const App = () => {
         log(`Metadata: ${title} | ${artist} | ${trackObj.uri}`);
         
         const getAppleMusicTTML = async () => {
-            log("Attempting Apple Music (Paxsenix)...");
-            const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
-            let searchRes;
-            try { 
-                searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json()); 
+            log("Resolving Apple Music mapping...");
+            const spotifyId = trackObj.uri?.split(":")[2];
+            let amId = "";
+
+            try {
+                const songlinkUrl = `https://api.song.link/v1-alpha.1/links?url=spotify:track:${spotifyId}`;
+                const slRes = await fetch(songlinkUrl).then(r => r.json());
+                const amEntity = slRes?.linksByPlatform?.appleMusic;
+                if (amEntity) {
+                    // Songlink returns amId in the entityUniqueId or as part of the URL
+                    amId = amEntity.entityUniqueId.split("::")[1]; // Format is usually appleMusic::[ID]
+                    log(`Songlink found Apple Music ID: ${amId}`, "success");
+                }
             } catch (e) {
-                searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                log("Songlink mapping failed, falling back to search.", "warn");
+            }
+
+            if (!amId) {
+                log("Attempting Apple Music Search (Paxsenix)...");
+                const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
+                let searchRes;
+                try { 
+                    searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json()); 
+                } catch (e) {
+                    searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                }
+                
+                let arr = searchRes?.results || searchRes?.data || searchRes?.items;
+                if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
+                if (arr && arr.length > 0) {
+                    amId = arr[0].id;
+                    log(`Found AM Search Match: ${amId} (${arr[0].name})`, "success");
+                }
             }
             
-            let arr = searchRes?.results || searchRes?.data || searchRes?.items;
-            if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
-            else if (!arr && typeof searchRes === 'object') {
-                Object.keys(searchRes).forEach(k => {
-                    if (Array.isArray(searchRes[k])) arr = searchRes[k];
-                });
-            }
-            if (arr && arr.length > 0) {
-                const amId = arr[0].id;
-                log(`Found AM Match: ${amId} (${arr[0].name})`, "success");
+            if (amId) {
                 const lyricsUrl = `https://lyrics.paxsenix.org/apple-music/lyrics?id=${amId}&ttml=true`;
                 let text = "";
                 try {
@@ -202,7 +219,7 @@ const App = () => {
                     return { parsed, source: "Apple Music TTML" };
                 }
             }
-            log("Apple Music: No results or failed search.", "warn");
+            log("Apple Music: No results or failed mapping.", "warn");
             throw new Error("No Apple Music match");
         };
 
