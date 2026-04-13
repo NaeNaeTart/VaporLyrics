@@ -146,12 +146,12 @@ const App = () => {
         setStatus(`Syncing: ${cleanArtist} - ${cleanTitle}`);
         
         const getAppleMusicTTML = async () => {
-            const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanTitle + " " + cleanArtist)}`;
+            const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
             let searchRes;
             try { 
-                searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' } }).then(r => r.json()); 
+                searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json()); 
             } catch (e) {
-                searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' });
+                searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
             }
             
             let arr = searchRes?.results || searchRes?.data || searchRes?.items;
@@ -166,7 +166,7 @@ const App = () => {
                 const lyricsUrl = `https://lyrics.paxsenix.org/apple-music/lyrics?id=${amId}&ttml=true`;
                 let text = "";
                 try {
-                    const res = await fetch(lyricsUrl, { headers: { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' } });
+                    const res = await fetch(lyricsUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
                     if (!res.ok) throw new Error("AM Fetch Error");
                     text = await res.text();
                     try {
@@ -175,7 +175,7 @@ const App = () => {
                         else if (obj.ttml || obj.lyrics) text = obj.ttml || obj.lyrics;
                     } catch(e) {}
                 } catch (e) {
-                    const ttmlRes = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' });
+                    const ttmlRes = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
                     text = typeof ttmlRes === 'string' ? ttmlRes : (ttmlRes.ttml || ttmlRes.lyrics || JSON.stringify(ttmlRes));
                 }
 
@@ -189,7 +189,7 @@ const App = () => {
             const url = `https://lyrics.paxsenix.org/musixmatch/lyrics?t=${encodeURIComponent(cleanTitle)}&a=${encodeURIComponent(cleanArtist)}&type=word`;
             let text = "";
             try {
-                const res = await fetch(url, { headers: { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' } });
+                const res = await fetch(url, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
                 if (!res.ok) throw new Error("MXM Fetch Error");
                 text = await res.text();
                 // Attempt to parse out if it returned a JSON escaped string or object
@@ -201,7 +201,7 @@ const App = () => {
                 } catch(e) {}
             } catch (e) {
                 // Fallback to CosmosAsync if CORS blocked native fetch
-                const res = await Spicetify.CosmosAsync.get(url, null, { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' });
+                const res = await Spicetify.CosmosAsync.get(url, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
                 text = typeof res === 'string' ? res : (res.lyrics || res.text || JSON.stringify(res));
             }
 
@@ -433,8 +433,7 @@ const App = () => {
                 key: "canvas", 
                 ref: canvasRef, 
                 style: { width: "100%", height: "100%", position: "absolute", top: 0, left: 0 } 
-            }),
-            React.createElement("div", { className: "vhs-overlay", key: "vhs" })
+            })
         ]),
         React.createElement("div", { className: "vapor-content", key: "content" }, [
             React.createElement("header", { className: "vapor-header", key: "header" }, [
