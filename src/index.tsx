@@ -225,24 +225,47 @@ const App = () => {
                 log(`Final Target AM ID: ${amId}`);
                 log(`Requesting TTML from Paxsenix...`);
                 let text = "";
+                
+                const processAmResponse = (resStr: string) => {
+                    log(`Response Length: ${resStr.length} chars`);
+                    try {
+                        const obj = JSON.parse(resStr);
+                        log(`Parsed JSON metadata: ${Object.keys(obj).join(", ")}`);
+                        if (typeof obj === 'string') return obj;
+                        if (obj.ttml) return obj.ttml;
+                        if (obj.lyrics) return obj.lyrics;
+                        if (obj.data?.lyrics) return obj.data.lyrics;
+                    } catch(e) {
+                        log("Response is likely raw TTML/XML string.");
+                    }
+                    return resStr;
+                };
+
                 try {
                     const res = await fetch(lyricsUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
-                    if (!res.ok) throw new Error("AM Fetch Error");
+                    log(`Fetch Status: ${res.status} ${res.statusText}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
                     text = await res.text();
-                    try {
-                        const obj = JSON.parse(text);
-                        if (typeof obj === 'string') text = obj;
-                        else if (obj.ttml || obj.lyrics) text = obj.ttml || obj.lyrics;
-                    } catch(e) {}
+                    text = processAmResponse(text);
                 } catch (e) {
-                    const ttmlRes = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
-                    text = typeof ttmlRes === 'string' ? ttmlRes : (ttmlRes.ttml || ttmlRes.lyrics || JSON.stringify(ttmlRes));
+                    log(`Fetch failed: ${e}. Falling back to CosmosAsync...`, "warn");
+                    try {
+                        const ttmlRes = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                        text = typeof ttmlRes === 'string' ? ttmlRes : (ttmlRes.ttml || ttmlRes.lyrics || ttmlRes.data?.lyrics || JSON.stringify(ttmlRes));
+                        log("CosmosAsync fetch completed.");
+                    } catch (err) {
+                        log(`CosmosAsync also failed: ${err}`, "error");
+                    }
                 }
 
-                const parsed = parseTTML(text);
-                if (parsed.length > 0) {
-                    log("Successfully parsed AM TTML", "success");
-                    return { parsed, source: "Apple Music TTML" };
+                if (text && text.includes("<tt")) {
+                    const parsed = parseTTML(text);
+                    if (parsed.length > 0) {
+                        log("Successfully parsed AM TTML", "success");
+                        return { parsed, source: "Apple Music TTML" };
+                    }
+                } else if (text) {
+                    log("Text found but doesn't look like TTML. Samples: " + text.substring(0, 50), "warn");
                 }
             }
             log("Apple Music: No results or failed mapping.", "warn");
