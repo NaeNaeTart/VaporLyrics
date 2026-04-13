@@ -171,7 +171,7 @@ const App = () => {
                 log(`Direct ISRC lookup: ${isrc}`);
                 try {
                     const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
-                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Spicetify/1.0 (https://github.com/spicetify/spicetify-cli)' });
                     let arr = res?.results || res?.data || res?.items;
                     if (Array.isArray(res)) arr = res;
                     if (arr && arr.length > 0) {
@@ -243,7 +243,7 @@ const App = () => {
                 };
 
                 try {
-                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Spicetify/1.0 (https://github.com/spicetify/spicetify-cli)' });
                     text = typeof res === 'string' ? res : (res.ttml || res.lyrics || res.data?.lyrics || JSON.stringify(res));
                     text = processAmResponse(text);
                 } catch (e) {
@@ -312,25 +312,26 @@ const App = () => {
         const getNetEase = async () => {
             log("Attempting NetEase...");
             const searchUrl = `https://lyrics.paxsenix.org/netease/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
-            const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json());
-            const songId = searchRes?.result?.songs?.[0]?.id;
-            if (!songId) {
-                log("NetEase: No search results.", "warn");
-                throw new Error("No NetEase match");
-            }
+            try {
+                const searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Spicetify/1.0 (https://github.com/spicetify/spicetify-cli)' });
+                const songId = searchRes?.result?.songs?.[0]?.id;
+                if (!songId) {
+                    log("NetEase: No search results.", "warn");
+                    throw new Error("No NetEase match");
+                }
 
-            // We use a different proxy for the actual lyrics if Paxsenix 403s
-            log(`Found NetEase Match: ${songId}. Fetching lyrics...`);
-            const lyricUrl = `https://music.cyrvoid.com/lyric?id=${songId}`;
-            const res = await fetch(lyricUrl).then(r => r.json());
-            const lrc = res?.lrc?.lyric || "";
-            const yrc = res?.yrc?.lyric || ""; // YRC is NetEase's word-sync format
+                // We use a different proxy for the actual lyrics if Paxsenix 403s
+                log(`Found NetEase Match: ${songId}. Fetching lyrics...`);
+                const lyricUrl = `https://music.cyrvoid.com/lyric?id=${songId}`;
+                const res = await fetch(lyricUrl).then(r => r.json());
+                const lrc = res?.lrc?.lyric || "";
+                const yrc = res?.yrc?.lyric || ""; // YRC is NetEase's word-sync format
             
-            if (!lrc && !yrc) {
-                log("NetEase: No lyrics returned for this ID.", "warn");
-            }
-
-            const parseYRC = (yrc: string): LyricLine[] => {
+                if (!lrc && !yrc) {
+                    log("NetEase: No lyrics returned for this ID.", "warn");
+                }
+                
+                const parseYRC = (yrc: string): LyricLine[] => {
                 const parsed: LyricLine[] = [];
                 const lines = yrc.split('\n');
                 lines.forEach(line => {
@@ -367,6 +368,10 @@ const App = () => {
             }
             log("NetEase: Parse failed.", "error");
             throw new Error("NetEase parse failed");
+            } catch (e) {
+                log(`NetEase fetch failed: ${e}`, "error");
+                throw e;
+            }
         };
 
         const getSpotify = async () => {

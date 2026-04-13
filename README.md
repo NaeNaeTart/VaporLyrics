@@ -22,11 +22,9 @@ This project uses Bun for bundling and TypeScript for development.
    spicetify apply
    ```
 
-This extension is inspired by Spikerko's "Spicy Lyrics" extension.
-
 ## License
 This project is licensed under the terms of the GNU General Public License v3.0.
 
 ## Credits
-- [Paxsenix](https://github.com/Paxsenix) for the lyrics API
-- [Songlink](https://songlink.io/) for the song mapping API
+- [Paxsenix](https://github.com/Paxsenix0) for the lyrics API
+- [Spikerko](https://github.com/Spikerko) for the "Spicy Lyrics" extension
