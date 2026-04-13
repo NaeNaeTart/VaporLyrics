@@ -21,3 +21,12 @@ This project uses Bun for bundling and TypeScript for development.
    spicetify config extensions Vapor-Lyrics.js
    spicetify apply
    ```
+
+This extension is inspired by Spikerko's "Spicy Lyrics" extension.
+
+## License
+This project is licensed under the terms of the GNU General Public License v3.0.
+
+## Credits
+- Paxsenix for the lyrics API
+- Songlink for the song mapping API

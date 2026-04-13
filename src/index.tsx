@@ -600,7 +600,19 @@ const App = () => {
             }, [
                 React.createElement("header", { key: "h" }, [
                     React.createElement("h2", { key: "t" }, "Terminal Uplink"),
-                    React.createElement("button", { key: "b", onClick: () => setShowDebug(false) }, "✖")
+                    React.createElement("div", { key: "btns", style: { display: "flex", gap: "8px" } }, [
+                        React.createElement("button", { 
+                            key: "cp", 
+                            onClick: () => {
+                                const text = debugLogs.join('\n');
+                                navigator.clipboard.writeText(text);
+                                setStatus("Logs Copied!");
+                                setTimeout(() => setStatus(status), 2000);
+                            },
+                            style: { fontSize: "10px", padding: "2px 6px" }
+                        }, "COPY ALL"),
+                        React.createElement("button", { key: "b", onClick: () => setShowDebug(false) }, "✖")
+                    ])
                 ]),
                 React.createElement("div", { className: "debug-list", key: "l" }, 
                     debugLogs.map((log, i) => React.createElement("div", { key: i, className: "debug-line" }, log))
