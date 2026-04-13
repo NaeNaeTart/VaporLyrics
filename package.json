@@ -1,0 +1,32 @@
+{
+  "name": "vapor-lyrics",
+  "version": "1.0.0",
+  "author": "NaeNaeTart",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NaeNaeTart/VaporLyrics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/NaeNaeTart/VaporLyrics/issues"
+  },
+  "homepage": "https://github.com/NaeNaeTart/VaporLyrics#readme",
+  "scripts": {
+    "build": "bun build ./src/index.tsx --outfile ./Vapor-Lyrics.js --minify",
+    "postbuild": "bun ./scripts/copy-to-spicetify.ts",
+    "deploy": "bun run build && spicetify apply",
+    "watch": "bun build ./src/index.tsx --outfile ./Vapor-Lyrics.js --watch",
+    "apply": "spicetify apply"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@kawarp/core": "^1.1.1",
+    "@kawarp/react": "^1.1.1"
+  }
+}

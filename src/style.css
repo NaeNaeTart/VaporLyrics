@@ -1,0 +1,146 @@
+:root {
+  --vapor-pink: #ff71ce;
+  --vapor-blue: #01cdfe;
+  --vapor-green: #05ffa1;
+  --vapor-purple: #b967ff;
+  --vapor-yellow: #fffb96;
+}
+
+#vapor-lyrics-app-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.vapor-background {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000000;
+  z-index: -1;
+}
+
+.vapor-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 40px;
+  color: white;
+  font-family: "Outfit", "Inter", sans-serif;
+  box-sizing: border-box;
+}
+
+.vapor-header {
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.vapor-title {
+  font-size: 3rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 12px;
+  background: linear-gradient(to bottom, var(--vapor-pink), var(--vapor-blue));
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 10px rgba(255, 113, 206, 0.5));
+  margin: 0;
+}
+
+.vapor-lyrics-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  mask-image: linear-gradient(to bottom, 
+    transparent 0%, 
+    black 15%, 
+    black 85%, 
+    transparent 100%
+  );
+}
+
+/* The Dreamlike Scroll */
+.vapor-lyrics-scroll {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 50vh 0;
+  will-change: transform;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.vapor-lyric-line {
+  flex-shrink: 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1.5;
+  margin: 1.5rem 0;
+  text-align: center;
+  max-width: 80%;
+  
+  /* Top-to-Bottom Wipe Effect */
+  background: linear-gradient(to bottom, #ffffff 50%, rgba(255, 255, 255, 0.25) 50%);
+  background-size: 100% 200%;
+  background-position: bottom;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  
+  filter: blur(1px) drop-shadow(0 0 0px transparent);
+  transform: translate3d(0,0,0) scale(0.85);
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
+              background-position 0.5s ease-out,
+              filter 0.5s ease,
+              opacity 0.5s ease;
+  will-change: transform, background-position, filter, opacity;
+}
+
+.vapor-lyric-line.active {
+  background-position: top;
+  opacity: 1;
+  transform: translate3d(0,0,0) scale(1.15);
+  filter: blur(0) drop-shadow(0 0 10px rgba(1, 205, 254, 0.8));
+  /* Dynamic Karaoke Wipe Duration */
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
+              background-position var(--line-duration, 0.5s) linear,
+              filter 0.5s ease,
+              opacity 0.5s ease;
+}
+
+.vapor-lyric-line.played {
+  background-position: top;
+  opacity: 0.35;
+  transform: translate3d(0,0,0) scale(0.85);
+  filter: blur(1.5px) drop-shadow(0 0 0px transparent);
+}
+
+.vapor-lyric-line.placeholder {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+  100% { opacity: 0.2; }
+}
+
+.vapor-debug-status {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  opacity: 0.3;
+  font-family: monospace;
+}
