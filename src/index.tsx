@@ -163,23 +163,47 @@ const App = () => {
         const getAppleMusicTTML = async () => {
             log("Resolving Apple Music mapping...");
             const spotifyId = trackObj.uri?.split(":")[2];
+            const isrc = trackObj.metadata?.isrc;
             let amId = "";
 
-            try {
-                const songlinkUrl = `https://api.song.link/v1-alpha.1/links?url=spotify:track:${spotifyId}`;
-                const slRes = await fetch(songlinkUrl).then(r => r.json());
-                const amEntity = slRes?.linksByPlatform?.appleMusic;
-                if (amEntity) {
-                    // Songlink returns amId in the entityUniqueId or as part of the URL
-                    amId = amEntity.entityUniqueId.split("::")[1]; // Format is usually appleMusic::[ID]
-                    log(`Songlink found Apple Music ID: ${amId}`, "success");
+            // Layer 1: ISRC Search (Most Accurate)
+            if (isrc) {
+                log(`Direct ISRC lookup: ${isrc}`);
+                try {
+                    const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
+                    const res = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json());
+                    let arr = res?.results || res?.data || res?.items;
+                    if (Array.isArray(res)) arr = res;
+                    if (arr && arr.length > 0) {
+                        amId = arr[0].id;
+                        log(`Match found via ISRC: ${amId} (${arr[0].name})`, "success");
+                    }
+                } catch (e) {
+                    log("ISRC search failed, trying Songlink...", "warn");
                 }
-            } catch (e) {
-                log("Songlink mapping failed, falling back to search.", "warn");
             }
 
+            // Layer 2: Songlink Mapping (Accurate but rate-limited)
             if (!amId) {
-                log("Attempting Apple Music Search (Paxsenix)...");
+                log("Trying Songlink mapping...");
+                try {
+                    const songlinkUrl = `https://api.song.link/v1-alpha.1/links?url=spotify:track:${spotifyId}`;
+                    const slRes = await fetch(songlinkUrl).then(r => r.json());
+                    const amEntity = slRes?.linksByPlatform?.appleMusic;
+                    if (amEntity) {
+                        amId = amEntity.entityUniqueId.split("::")[1];
+                        log(`Songlink mapped Apple Music ID: ${amId}`, "success");
+                    } else if (slRes?.statusCode === 429) {
+                        log("Songlink 429: Too Many Requests.", "warn");
+                    }
+                } catch (e) {
+                    log("Songlink mapping failed, trying fuzzy search...", "warn");
+                }
+            }
+
+            // Layer 3: Fuzzy Text Search (Fallback)
+            if (!amId) {
+                log(`Attempting Fuzzy Search: ${cleanArtist} - ${cleanTitle}`);
                 const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
                 let searchRes;
                 try { 
@@ -192,13 +216,13 @@ const App = () => {
                 if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
                 if (arr && arr.length > 0) {
                     amId = arr[0].id;
-                    log(`Found AM Search Match: ${amId} (${arr[0].name})`, "success");
+                    log(`Fuzzy Search found ID: ${amId} (${arr[0].name})`, "success");
                 }
             }
             
             if (amId) {
                 const lyricsUrl = `https://lyrics.paxsenix.org/apple-music/lyrics?id=${amId}&ttml=true`;
-                log(`Target AM ID: ${amId}`);
+                log(`Final Target AM ID: ${amId}`);
                 log(`Requesting TTML from Paxsenix...`);
                 let text = "";
                 try {
