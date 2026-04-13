@@ -144,3 +144,62 @@
   opacity: 0.3;
   font-family: monospace;
 }
+
+/* Word Sync / Karaoke Aesthetics */
+.vapor-syllable {
+  display: inline-block;
+  opacity: 0.25;
+  transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
+  filter: blur(1.5px);
+  transform: scale(0.95);
+  margin-right: 4px;
+}
+
+.vapor-syllable.synced {
+  opacity: 1;
+  filter: blur(0) drop-shadow(0 0 12px var(--vapor-blue));
+  transform: scale(1.1);
+  color: #ffffff;
+  -webkit-text-fill-color: initial;
+}
+
+.vapor-lyric-line.active.word-synced {
+  background: none;
+  -webkit-text-fill-color: initial;
+}
+
+/* VHS Overlay */
+.vhs-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  background-size: 100% 3px, 3px 100%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.4;
+}
+
+.vhs-overlay::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: rgba(18, 16, 16, 0.03);
+  opacity: 0;
+  z-index: 1000;
+  pointer-events: none;
+  animation: vhs-flicker 0.1s infinite;
+}
+
+@keyframes vhs-flicker {
+  0% { opacity: 0.1; }
+  50% { opacity: 0.05; }
+  100% { opacity: 0.15; }
+}

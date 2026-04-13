@@ -213,10 +213,60 @@ const App = () => {
         const getLrcLib = async () => {
             const res = await Spicetify.CosmosAsync.get(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`);
             if (res && res.length > 0) {
-                const parsed = parseLRC(res[0].syncedLyrics || res[0].plainLyrics || "");
+                const item = res[0];
+                const text = item.syncedLyrics || item.plainLyrics || "";
+                const parsed = parseLRC(text);
                 if (parsed.length > 0) return { parsed, source: "LRCLIB" };
             }
             throw new Error("No LRCLIB match");
+        };
+
+        const getNetEase = async () => {
+            const searchUrl = `https://lyrics.paxsenix.org/netease/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
+            const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' } }).then(r => r.json());
+            const songId = searchRes?.result?.songs?.[0]?.id;
+            if (!songId) throw new Error("No NetEase match");
+
+            // We use a different proxy for the actual lyrics if Paxsenix 403s
+            const lyricUrl = `https://music.cyrvoid.com/lyric?id=${songId}`;
+            const res = await fetch(lyricUrl).then(r => r.json());
+            const lrc = res?.lrc?.lyric || "";
+            const yrc = res?.yrc?.lyric || ""; // YRC is NetEase's word-sync format
+
+            const parseYRC = (yrc: string): LyricLine[] => {
+                const parsed: LyricLine[] = [];
+                const lines = yrc.split('\n');
+                lines.forEach(line => {
+                    const match = line.match(/\[(\d+),(\d+)\](.*)/);
+                    if (match) {
+                        const startTime = parseInt(match[1]);
+                        const wordsRaw = match[3];
+                        const syllables: LyricSyllable[] = [];
+                        let cleanWords = "";
+                        
+                        // YRC Word format: (start,duration,0)Word
+                        const wordRegex = /\((\d+),(\d+),\d+\)([^\(]*)/g;
+                        let wMatch;
+                        while ((wMatch = wordRegex.exec(wordsRaw)) !== null) {
+                            const wordStart = parseInt(wMatch[1]);
+                            const wordText = wMatch[3];
+                            syllables.push({ startTime: startTime + wordStart, word: wordText });
+                            cleanWords += wordText;
+                        }
+                        
+                        parsed.push({ 
+                            startTime, 
+                            words: syllables.length > 0 ? cleanWords : wordsRaw, 
+                            syllables: syllables.length > 0 ? syllables : undefined 
+                        });
+                    }
+                });
+                return parsed;
+            };
+
+            const parsed = yrc ? parseYRC(yrc) : parseLRC(lrc);
+            if (parsed.length > 0) return { parsed, source: yrc ? "NetEase Word-Sync" : "NetEase" };
+            throw new Error("NetEase parse failed");
         };
 
         const getSpotify = async () => {
@@ -271,6 +321,7 @@ const App = () => {
             getSpotify().then(applyLyrics),
             getAppleMusicTTML().then(applyLyrics),
             getMusixmatchWord().then(applyLyrics),
+            getNetEase().then(applyLyrics),
             getLrcLib().then(applyLyrics)
         ];
 
@@ -425,7 +476,8 @@ const App = () => {
                 className: "vapor-debug-status", 
                 key: "st",
                 onClick: () => { trackRef.current = null; fetchLyrics(); }
-            }, status)
+            }, status),
+            React.createElement("div", { className: "vhs-overlay", key: "vhs" })
         ])
     ]);
 };

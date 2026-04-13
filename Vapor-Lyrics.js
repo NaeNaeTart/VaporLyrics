@@ -1,150 +1,209 @@
-var R=`:root {
-  --vapor-pink: #ff71ce;
-  --vapor-blue: #01cdfe;
-  --vapor-green: #05ffa1;
-  --vapor-purple: #b967ff;
-  --vapor-yellow: #fffb96;
-}
-
-#vapor-lyrics-app-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  z-index: 100;
-}
-
-.vapor-background {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: #000000;
-  z-index: -1;
-}
-
-.vapor-content {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  padding: 40px;
-  color: white;
-  font-family: "Outfit", "Inter", sans-serif;
-  box-sizing: border-box;
-}
-
-.vapor-header {
-  margin-bottom: 40px;
-  text-align: center;
-}
-
-.vapor-title {
-  font-size: 3rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 12px;
-  background: linear-gradient(to bottom, var(--vapor-pink), var(--vapor-blue));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 10px rgba(255, 113, 206, 0.5));
-  margin: 0;
-}
-
-.vapor-lyrics-container {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-  mask-image: linear-gradient(to bottom, 
-    transparent 0%, 
-    black 15%, 
-    black 85%, 
-    transparent 100%
-  );
-}
-
-/* The Dreamlike Scroll */
-.vapor-lyrics-scroll {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 50vh 0;
-  will-change: transform;
-  transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
-}
-
-.vapor-lyric-line {
-  flex-shrink: 0;
-  font-size: 2.2rem;
-  font-weight: 700;
-  line-height: 1.5;
-  margin: 1.5rem 0;
-  text-align: center;
-  max-width: 80%;
-  
-  /* Top-to-Bottom Wipe Effect */
-  background: linear-gradient(to bottom, #ffffff 50%, rgba(255, 255, 255, 0.25) 50%);
-  background-size: 100% 200%;
-  background-position: bottom;
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  
-  filter: blur(1px) drop-shadow(0 0 0px transparent);
-  transform: translate3d(0,0,0) scale(0.85);
-  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
-              background-position 0.5s ease-out,
-              filter 0.5s ease,
-              opacity 0.5s ease;
-  will-change: transform, background-position, filter, opacity;
-}
-
-.vapor-lyric-line.active {
-  background-position: top;
-  opacity: 1;
-  transform: translate3d(0,0,0) scale(1.15);
-  filter: blur(0) drop-shadow(0 0 10px rgba(1, 205, 254, 0.8));
-  /* Dynamic Karaoke Wipe Duration */
-  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
-              background-position var(--line-duration, 0.5s) linear,
-              filter 0.5s ease,
-              opacity 0.5s ease;
-}
-
-.vapor-lyric-line.played {
-  background-position: top;
-  opacity: 0.35;
-  transform: translate3d(0,0,0) scale(0.85);
-  filter: blur(1.5px) drop-shadow(0 0 0px transparent);
-}
-
-.vapor-lyric-line.placeholder {
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.2; }
-  50% { opacity: 0.5; }
-  100% { opacity: 0.2; }
-}
-
-.vapor-debug-status {
-  position: fixed;
-  bottom: 20px;
-  left: 20px;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  opacity: 0.3;
-  font-family: monospace;
-}
-`;class u{canvas;gl;halfFloatExt=null;halfFloatLinearExt=null;blurProgram;blendProgram;tintProgram;warpProgram;outputProgram;positionBuffer;texCoordBuffer;sourceTexture;blurFBO1;blurFBO2;currentAlbumFBO;nextAlbumFBO;warpFBO;animationId=null;lastFrameTime=0;accumulatedTime=0;isPlaying=!1;isTransitioning=!1;transitionStartTime=0;_transitionDuration;_warpIntensity;_blurPasses;_animationSpeed;_targetAnimationSpeed;_saturation;_tintColor;_tintIntensity;_dithering;_scale;hasImage=!1;attribs;uniforms;constructor(k,J={}){this.canvas=k;let z=k.getContext("webgl",{preserveDrawingBuffer:!0});if(!z)throw Error("WebGL not supported");this.gl=z,this.halfFloatExt=z.getExtension("OES_texture_half_float"),this.halfFloatLinearExt=z.getExtension("OES_texture_half_float_linear"),this._warpIntensity=J.warpIntensity??1,this._blurPasses=J.blurPasses??8,this._animationSpeed=J.animationSpeed??1,this._targetAnimationSpeed=this._animationSpeed,this._transitionDuration=J.transitionDuration??1000,this._saturation=J.saturation??1.5,this._tintColor=J.tintColor??[0.157,0.157,0.235],this._tintIntensity=J.tintIntensity??0.15,this._dithering=J.dithering??0.008,this._scale=J.scale??1,this.blurProgram=this.createProgram(`
+var e=`:root {\r
+  --vapor-pink: #ff71ce;\r
+  --vapor-blue: #01cdfe;\r
+  --vapor-green: #05ffa1;\r
+  --vapor-purple: #b967ff;\r
+  --vapor-yellow: #fffb96;\r
+}\r
+\r
+#vapor-lyrics-app-container {\r
+  position: absolute;\r
+  top: 0;\r
+  left: 0;\r
+  width: 100%;\r
+  height: 100%;\r
+  overflow: hidden;\r
+  z-index: 100;\r
+}\r
+\r
+.vapor-background {\r
+  position: absolute;\r
+  inset: 0;\r
+  overflow: hidden;\r
+  background: #000000;\r
+  z-index: -1;\r
+}\r
+\r
+.vapor-content {\r
+  display: flex;\r
+  flex-direction: column;\r
+  height: 100%;\r
+  padding: 40px;\r
+  color: white;\r
+  font-family: "Outfit", "Inter", sans-serif;\r
+  box-sizing: border-box;\r
+}\r
+\r
+.vapor-header {\r
+  margin-bottom: 40px;\r
+  text-align: center;\r
+}\r
+\r
+.vapor-title {\r
+  font-size: 3rem;\r
+  font-weight: 800;\r
+  text-transform: uppercase;\r
+  letter-spacing: 12px;\r
+  background: linear-gradient(to bottom, var(--vapor-pink), var(--vapor-blue));\r
+  background-clip: text;\r
+  -webkit-background-clip: text;\r
+  -webkit-text-fill-color: transparent;\r
+  filter: drop-shadow(0 0 10px rgba(255, 113, 206, 0.5));\r
+  margin: 0;\r
+}\r
+\r
+.vapor-lyrics-container {\r
+  flex: 1;\r
+  overflow: hidden;\r
+  position: relative;\r
+  mask-image: linear-gradient(to bottom, \r
+    transparent 0%, \r
+    black 15%, \r
+    black 85%, \r
+    transparent 100%\r
+  );\r
+}\r
+\r
+/* The Dreamlike Scroll */\r
+.vapor-lyrics-scroll {\r
+  position: absolute;\r
+  top: 0;\r
+  left: 0;\r
+  width: 100%;\r
+  display: flex;\r
+  flex-direction: column;\r
+  align-items: center;\r
+  padding: 50vh 0;\r
+  will-change: transform;\r
+  transform-style: preserve-3d;\r
+  transition: transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);\r
+}\r
+\r
+.vapor-lyric-line {\r
+  flex-shrink: 0;\r
+  font-size: 2.2rem;\r
+  font-weight: 700;\r
+  line-height: 1.5;\r
+  margin: 1.5rem 0;\r
+  text-align: center;\r
+  max-width: 80%;\r
+  \r
+  /* Top-to-Bottom Wipe Effect */\r
+  background: linear-gradient(to bottom, #ffffff 50%, rgba(255, 255, 255, 0.25) 50%);\r
+  background-size: 100% 200%;\r
+  background-position: bottom;\r
+  background-clip: text;\r
+  -webkit-background-clip: text;\r
+  -webkit-text-fill-color: transparent;\r
+  \r
+  filter: blur(1px) drop-shadow(0 0 0px transparent);\r
+  transform: translate3d(0,0,0) scale(0.85);\r
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), \r
+              background-position 0.5s ease-out,\r
+              filter 0.5s ease,\r
+              opacity 0.5s ease;\r
+  will-change: transform, background-position, filter, opacity;\r
+}\r
+\r
+.vapor-lyric-line.active {\r
+  background-position: top;\r
+  opacity: 1;\r
+  transform: translate3d(0,0,0) scale(1.15);\r
+  filter: blur(0) drop-shadow(0 0 10px rgba(1, 205, 254, 0.8));\r
+  /* Dynamic Karaoke Wipe Duration */\r
+  transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), \r
+              background-position var(--line-duration, 0.5s) linear,\r
+              filter 0.5s ease,\r
+              opacity 0.5s ease;\r
+}\r
+\r
+.vapor-lyric-line.played {\r
+  background-position: top;\r
+  opacity: 0.35;\r
+  transform: translate3d(0,0,0) scale(0.85);\r
+  filter: blur(1.5px) drop-shadow(0 0 0px transparent);\r
+}\r
+\r
+.vapor-lyric-line.placeholder {\r
+  animation: pulse 2s infinite;\r
+}\r
+\r
+@keyframes pulse {\r
+  0% { opacity: 0.2; }\r
+  50% { opacity: 0.5; }\r
+  100% { opacity: 0.2; }\r
+}\r
+\r
+.vapor-debug-status {\r
+  position: fixed;\r
+  bottom: 20px;\r
+  left: 20px;\r
+  font-size: 10px;\r
+  text-transform: uppercase;\r
+  letter-spacing: 2px;\r
+  opacity: 0.3;\r
+  font-family: monospace;\r
+}\r
+\r
+/* Word Sync / Karaoke Aesthetics */\r
+.vapor-syllable {\r
+  display: inline-block;\r
+  opacity: 0.25;\r
+  transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);\r
+  filter: blur(1.5px);\r
+  transform: scale(0.95);\r
+  margin-right: 4px;\r
+}\r
+\r
+.vapor-syllable.synced {\r
+  opacity: 1;\r
+  filter: blur(0) drop-shadow(0 0 12px var(--vapor-blue));\r
+  transform: scale(1.1);\r
+  color: #ffffff;\r
+  -webkit-text-fill-color: initial;\r
+}\r
+\r
+.vapor-lyric-line.active.word-synced {\r
+  background: none;\r
+  -webkit-text-fill-color: initial;\r
+}\r
+\r
+/* VHS Overlay */\r
+.vhs-overlay {\r
+  position: fixed;\r
+  top: 0;\r
+  left: 0;\r
+  width: 100vw;\r
+  height: 100vh;\r
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), \r
+              linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));\r
+  background-size: 100% 3px, 3px 100%;\r
+  pointer-events: none;\r
+  z-index: 1000;\r
+  opacity: 0.4;\r
+}\r
+\r
+.vhs-overlay::after {\r
+  content: " ";\r
+  display: block;\r
+  position: absolute;\r
+  top: 0;\r
+  left: 0;\r
+  bottom: 0;\r
+  right: 0;\r
+  background: rgba(18, 16, 16, 0.03);\r
+  opacity: 0;\r
+  z-index: 1000;\r
+  pointer-events: none;\r
+  animation: vhs-flicker 0.1s infinite;\r
+}\r
+\r
+@keyframes vhs-flicker {\r
+  0% { opacity: 0.1; }\r
+  50% { opacity: 0.05; }\r
+  100% { opacity: 0.15; }\r
+}\r
+`;class d{canvas;gl;halfFloatExt=null;halfFloatLinearExt=null;blurProgram;blendProgram;tintProgram;warpProgram;outputProgram;positionBuffer;texCoordBuffer;sourceTexture;blurFBO1;blurFBO2;currentAlbumFBO;nextAlbumFBO;warpFBO;animationId=null;lastFrameTime=0;accumulatedTime=0;isPlaying=!1;isTransitioning=!1;transitionStartTime=0;_transitionDuration;_warpIntensity;_blurPasses;_animationSpeed;_targetAnimationSpeed;_saturation;_tintColor;_tintIntensity;_dithering;_scale;hasImage=!1;attribs;uniforms;constructor(z,b={}){this.canvas=z;let k=z.getContext("webgl",{preserveDrawingBuffer:!0});if(!k)throw Error("WebGL not supported");this.gl=k,this.halfFloatExt=k.getExtension("OES_texture_half_float"),this.halfFloatLinearExt=k.getExtension("OES_texture_half_float_linear"),this._warpIntensity=b.warpIntensity??1,this._blurPasses=b.blurPasses??8,this._animationSpeed=b.animationSpeed??1,this._targetAnimationSpeed=this._animationSpeed,this._transitionDuration=b.transitionDuration??1000,this._saturation=b.saturation??1.5,this._tintColor=b.tintColor??[0.157,0.157,0.235],this._tintIntensity=b.tintIntensity??0.15,this._dithering=b.dithering??0.008,this._scale=b.scale??1,this.blurProgram=this.createProgram(`
   attribute vec2 a_position;
   attribute vec2 a_texCoord;
   varying vec2 v_texCoord;
@@ -328,5 +387,6 @@ var R=`:root {
 
     gl_FragColor = color;
   }
-`),this.attribs={position:z.getAttribLocation(this.blurProgram,"a_position"),texCoord:z.getAttribLocation(this.blurProgram,"a_texCoord")},this.uniforms={blur:{resolution:z.getUniformLocation(this.blurProgram,"u_resolution"),texture:z.getUniformLocation(this.blurProgram,"u_texture"),offset:z.getUniformLocation(this.blurProgram,"u_offset")},blend:{texture1:z.getUniformLocation(this.blendProgram,"u_texture1"),texture2:z.getUniformLocation(this.blendProgram,"u_texture2"),blend:z.getUniformLocation(this.blendProgram,"u_blend")},warp:{texture:z.getUniformLocation(this.warpProgram,"u_texture"),time:z.getUniformLocation(this.warpProgram,"u_time"),intensity:z.getUniformLocation(this.warpProgram,"u_intensity")},tint:{texture:z.getUniformLocation(this.tintProgram,"u_texture"),tintColor:z.getUniformLocation(this.tintProgram,"u_tintColor"),tintIntensity:z.getUniformLocation(this.tintProgram,"u_tintIntensity")},output:{texture:z.getUniformLocation(this.outputProgram,"u_texture"),saturation:z.getUniformLocation(this.outputProgram,"u_saturation"),dithering:z.getUniformLocation(this.outputProgram,"u_dithering"),time:z.getUniformLocation(this.outputProgram,"u_time"),scale:z.getUniformLocation(this.outputProgram,"u_scale"),resolution:z.getUniformLocation(this.outputProgram,"u_resolution")}},this.positionBuffer=this.createBuffer(new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1])),this.texCoordBuffer=this.createBuffer(new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1])),this.sourceTexture=this.createTexture(),this.blurFBO1=this.createFramebuffer(128,128,!0),this.blurFBO2=this.createFramebuffer(128,128,!0),this.currentAlbumFBO=this.createFramebuffer(128,128,!0),this.nextAlbumFBO=this.createFramebuffer(128,128,!0),this.warpFBO=this.createFramebuffer(1,1,!0),this.resize()}get warpIntensity(){return this._warpIntensity}set warpIntensity(k){this._warpIntensity=Math.max(0,Math.min(1,k))}get blurPasses(){return this._blurPasses}set blurPasses(k){let J=Math.max(1,Math.min(40,Math.floor(k)));if(J!==this._blurPasses){if(this._blurPasses=J,this.hasImage)this.reblurCurrentImage()}}get animationSpeed(){return this._targetAnimationSpeed}set animationSpeed(k){this._targetAnimationSpeed=Math.max(0.1,Math.min(5,k))}get transitionDuration(){return this._transitionDuration}set transitionDuration(k){this._transitionDuration=Math.max(0,Math.min(5000,k))}get saturation(){return this._saturation}set saturation(k){this._saturation=Math.max(0,Math.min(3,k))}get tintColor(){return this._tintColor}set tintColor(k){let J=k.map((N)=>Math.max(0,Math.min(1,N)));if(J.some((N,X)=>N!==this._tintColor[X])){if(this._tintColor=J,this.hasImage)this.reblurCurrentImage()}}get tintIntensity(){return this._tintIntensity}set tintIntensity(k){let J=Math.max(0,Math.min(1,k));if(J!==this._tintIntensity){if(this._tintIntensity=J,this.hasImage)this.reblurCurrentImage()}}get dithering(){return this._dithering}set dithering(k){this._dithering=Math.max(0,Math.min(0.1,k))}get scale(){return this._scale}set scale(k){this._scale=Math.max(0.01,Math.min(4,k))}setOptions(k){if(k.warpIntensity!==void 0)this.warpIntensity=k.warpIntensity;if(k.blurPasses!==void 0)this.blurPasses=k.blurPasses;if(k.animationSpeed!==void 0)this.animationSpeed=k.animationSpeed;if(k.transitionDuration!==void 0)this.transitionDuration=k.transitionDuration;if(k.saturation!==void 0)this.saturation=k.saturation;if(k.tintColor!==void 0)this.tintColor=k.tintColor;if(k.tintIntensity!==void 0)this.tintIntensity=k.tintIntensity;if(k.dithering!==void 0)this.dithering=k.dithering;if(k.scale!==void 0)this.scale=k.scale}getOptions(){return{warpIntensity:this._warpIntensity,blurPasses:this._blurPasses,animationSpeed:this._targetAnimationSpeed,transitionDuration:this._transitionDuration,saturation:this._saturation,tintColor:this._tintColor,tintIntensity:this._tintIntensity,dithering:this._dithering,scale:this._scale}}loadImage(k){return new Promise((J,z)=>{let N=new Image;N.crossOrigin="anonymous",N.onload=()=>{this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,this.gl.RGBA,this.gl.UNSIGNED_BYTE,N),this.processNewImage(),J()},N.onerror=()=>z(Error(`Failed to load image: ${k}`)),N.src=k})}loadImageElement(k){this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,this.gl.RGBA,this.gl.UNSIGNED_BYTE,k),this.processNewImage()}loadImageData(k,J,z){this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,J,z,0,this.gl.RGBA,this.gl.UNSIGNED_BYTE,k instanceof Uint8ClampedArray?new Uint8Array(k.buffer):k),this.processNewImage()}loadFromImageData(k){this.loadImageData(k.data,k.width,k.height)}async loadBlob(k){let J=await createImageBitmap(k);this.loadImageElement(J),J.close()}loadBase64(k){let J=k.startsWith("data:")?k:`data:image/png;base64,${k}`;return this.loadImage(J)}async loadArrayBuffer(k,J="image/png"){let z=new Blob([k],{type:J});return this.loadBlob(z)}loadGradient(k,J=135){let N=document.createElement("canvas");N.width=512,N.height=512;let X=N.getContext("2d");if(!X)return;let Z=J*Math.PI/180,_=256-Math.cos(Z)*512,q=256-Math.sin(Z)*512,G=256+Math.cos(Z)*512,f=256+Math.sin(Z)*512,x=X.createLinearGradient(_,q,G,f);k.forEach((P,B)=>{x.addColorStop(B/(k.length-1),P)}),X.fillStyle=x,X.fillRect(0,0,512,512),this.loadImageElement(N)}processNewImage(){[this.currentAlbumFBO,this.nextAlbumFBO]=[this.nextAlbumFBO,this.currentAlbumFBO],this.blurSourceInto(this.nextAlbumFBO),this.hasImage=!0,this.isTransitioning=!0,this.transitionStartTime=performance.now()}reblurCurrentImage(){this.blurSourceInto(this.nextAlbumFBO)}blurSourceInto(k){let J=this.gl;J.useProgram(this.tintProgram),this.setupAttributes(),J.bindFramebuffer(J.FRAMEBUFFER,this.blurFBO1.framebuffer),J.viewport(0,0,128,128),J.activeTexture(J.TEXTURE0),J.bindTexture(J.TEXTURE_2D,this.sourceTexture),J.uniform1i(this.uniforms.tint.texture,0),J.uniform3fv(this.uniforms.tint.tintColor,this._tintColor),J.uniform1f(this.uniforms.tint.tintIntensity,this._tintIntensity),J.drawArrays(J.TRIANGLES,0,6),J.useProgram(this.blurProgram),this.setupAttributes(),J.uniform2f(this.uniforms.blur.resolution,128,128),J.uniform1i(this.uniforms.blur.texture,0);let z=this.blurFBO1,N=this.blurFBO2;for(let X=0;X<this._blurPasses;X++)J.bindFramebuffer(J.FRAMEBUFFER,N.framebuffer),J.viewport(0,0,128,128),J.bindTexture(J.TEXTURE_2D,z.texture),J.uniform1f(this.uniforms.blur.offset,X+0.5),J.drawArrays(J.TRIANGLES,0,6),[z,N]=[N,z];J.bindFramebuffer(J.FRAMEBUFFER,k.framebuffer),J.viewport(0,0,128,128),J.bindTexture(J.TEXTURE_2D,z.texture),J.uniform1f(this.uniforms.blur.offset,0),J.drawArrays(J.TRIANGLES,0,6)}resize(){let k=this.canvas.width,J=this.canvas.height;if(this.warpFBO)this.deleteFramebuffer(this.warpFBO);this.warpFBO=this.createFramebuffer(k,J,!0)}start(){if(this.isPlaying)return;this.isPlaying=!0,this.lastFrameTime=performance.now(),requestAnimationFrame(this.renderLoop)}stop(){if(this.isPlaying=!1,this.animationId!==null)cancelAnimationFrame(this.animationId),this.animationId=null}renderFrame(k){let J=performance.now();if(k!==void 0)this.render(k,J);else{let z=(J-this.lastFrameTime)/1000;this.lastFrameTime=J,this._animationSpeed+=(this._targetAnimationSpeed-this._animationSpeed)*0.05,this.accumulatedTime+=z*this._animationSpeed,this.render(this.accumulatedTime,J)}}dispose(){this.stop();let k=this.gl;k.deleteProgram(this.blurProgram),k.deleteProgram(this.blendProgram),k.deleteProgram(this.tintProgram),k.deleteProgram(this.warpProgram),k.deleteProgram(this.outputProgram),k.deleteBuffer(this.positionBuffer),k.deleteBuffer(this.texCoordBuffer),k.deleteTexture(this.sourceTexture),this.deleteFramebuffer(this.blurFBO1),this.deleteFramebuffer(this.blurFBO2),this.deleteFramebuffer(this.currentAlbumFBO),this.deleteFramebuffer(this.nextAlbumFBO),this.deleteFramebuffer(this.warpFBO)}renderLoop=(k)=>{if(!this.isPlaying)return;let J=(k-this.lastFrameTime)/1000;this.lastFrameTime=k,this._animationSpeed+=(this._targetAnimationSpeed-this._animationSpeed)*0.05,this.accumulatedTime+=J*this._animationSpeed,this.render(this.accumulatedTime,k),this.animationId=requestAnimationFrame(this.renderLoop)};render(k,J=performance.now()){let z=this.gl,N=this.canvas.width,X=this.canvas.height,Z=1;if(this.isTransitioning){let q=J-this.transitionStartTime;if(Z=Math.min(1,q/this._transitionDuration),Z>=1)this.isTransitioning=!1}let _;if(this.isTransitioning&&Z<1)z.useProgram(this.blendProgram),this.setupAttributes(),z.bindFramebuffer(z.FRAMEBUFFER,this.blurFBO1.framebuffer),z.viewport(0,0,128,128),z.activeTexture(z.TEXTURE0),z.bindTexture(z.TEXTURE_2D,this.currentAlbumFBO.texture),z.uniform1i(this.uniforms.blend.texture1,0),z.activeTexture(z.TEXTURE1),z.bindTexture(z.TEXTURE_2D,this.nextAlbumFBO.texture),z.uniform1i(this.uniforms.blend.texture2,1),z.uniform1f(this.uniforms.blend.blend,Z),z.drawArrays(z.TRIANGLES,0,6),_=this.blurFBO1.texture,z.useProgram(this.warpProgram),this.setupAttributes(),z.bindFramebuffer(z.FRAMEBUFFER,this.warpFBO.framebuffer),z.viewport(0,0,N,X),z.activeTexture(z.TEXTURE0),z.bindTexture(z.TEXTURE_2D,_),z.uniform1i(this.uniforms.warp.texture,0),z.uniform1f(this.uniforms.warp.time,k),z.uniform1f(this.uniforms.warp.intensity,this._warpIntensity),z.drawArrays(z.TRIANGLES,0,6),z.useProgram(this.outputProgram),this.setupAttributes(),z.bindFramebuffer(z.FRAMEBUFFER,null),z.viewport(0,0,N,X),z.bindTexture(z.TEXTURE_2D,this.warpFBO.texture),z.uniform1i(this.uniforms.output.texture,0),z.uniform1f(this.uniforms.output.saturation,this._saturation),z.uniform1f(this.uniforms.output.dithering,this._dithering),z.uniform1f(this.uniforms.output.time,k),z.uniform1f(this.uniforms.output.scale,this._scale),z.uniform2f(this.uniforms.output.resolution,N,X),z.drawArrays(z.TRIANGLES,0,6);else z.useProgram(this.warpProgram),this.setupAttributes(),z.bindFramebuffer(z.FRAMEBUFFER,this.warpFBO.framebuffer),z.viewport(0,0,N,X),z.activeTexture(z.TEXTURE0),z.bindTexture(z.TEXTURE_2D,this.nextAlbumFBO.texture),z.uniform1i(this.uniforms.warp.texture,0),z.uniform1f(this.uniforms.warp.time,k),z.uniform1f(this.uniforms.warp.intensity,this._warpIntensity),z.drawArrays(z.TRIANGLES,0,6),z.useProgram(this.outputProgram),this.setupAttributes(),z.bindFramebuffer(z.FRAMEBUFFER,null),z.viewport(0,0,N,X),z.bindTexture(z.TEXTURE_2D,this.warpFBO.texture),z.uniform1i(this.uniforms.output.texture,0),z.uniform1f(this.uniforms.output.saturation,this._saturation),z.uniform1f(this.uniforms.output.dithering,this._dithering),z.uniform1f(this.uniforms.output.time,k),z.uniform1f(this.uniforms.output.scale,this._scale),z.uniform2f(this.uniforms.output.resolution,N,X),z.drawArrays(z.TRIANGLES,0,6)}setupAttributes(){let k=this.gl;k.bindBuffer(k.ARRAY_BUFFER,this.positionBuffer),k.enableVertexAttribArray(this.attribs.position),k.vertexAttribPointer(this.attribs.position,2,k.FLOAT,!1,0,0),k.bindBuffer(k.ARRAY_BUFFER,this.texCoordBuffer),k.enableVertexAttribArray(this.attribs.texCoord),k.vertexAttribPointer(this.attribs.texCoord,2,k.FLOAT,!1,0,0)}createShader(k,J){let z=this.gl,N=z.createShader(k);if(!N)throw Error("Failed to create shader");if(z.shaderSource(N,J),z.compileShader(N),!z.getShaderParameter(N,z.COMPILE_STATUS)){let X=z.getShaderInfoLog(N);throw z.deleteShader(N),Error(`Shader compile error: ${X}`)}return N}createProgram(k,J){let z=this.gl,N=this.createShader(z.VERTEX_SHADER,k),X=this.createShader(z.FRAGMENT_SHADER,J),Z=z.createProgram();if(!Z)throw Error("Failed to create program");if(z.attachShader(Z,N),z.attachShader(Z,X),z.linkProgram(Z),!z.getProgramParameter(Z,z.LINK_STATUS)){let _=z.getProgramInfoLog(Z);throw z.deleteProgram(Z),Error(`Program link error: ${_}`)}return z.deleteShader(N),z.deleteShader(X),Z}createBuffer(k){let J=this.gl,z=J.createBuffer();if(!z)throw Error("Failed to create buffer");return J.bindBuffer(J.ARRAY_BUFFER,z),J.bufferData(J.ARRAY_BUFFER,k,J.STATIC_DRAW),z}createTexture(){let k=this.gl,J=k.createTexture();if(!J)throw Error("Failed to create texture");return k.bindTexture(k.TEXTURE_2D,J),k.texParameteri(k.TEXTURE_2D,k.TEXTURE_WRAP_S,k.CLAMP_TO_EDGE),k.texParameteri(k.TEXTURE_2D,k.TEXTURE_WRAP_T,k.CLAMP_TO_EDGE),k.texParameteri(k.TEXTURE_2D,k.TEXTURE_MIN_FILTER,k.LINEAR),k.texParameteri(k.TEXTURE_2D,k.TEXTURE_MAG_FILTER,k.LINEAR),J}createFramebuffer(k,J,z=!1){let N=this.gl,X=this.createTexture(),_=z&&this.halfFloatExt&&this.halfFloatLinearExt?this.halfFloatExt.HALF_FLOAT_OES:N.UNSIGNED_BYTE;N.texImage2D(N.TEXTURE_2D,0,N.RGBA,k,J,0,N.RGBA,_,null);let q=N.createFramebuffer();if(!q)throw Error("Failed to create framebuffer");return N.bindFramebuffer(N.FRAMEBUFFER,q),N.framebufferTexture2D(N.FRAMEBUFFER,N.COLOR_ATTACHMENT0,N.TEXTURE_2D,X,0),{framebuffer:q,texture:X}}deleteFramebuffer(k){this.gl.deleteFramebuffer(k.framebuffer),this.gl.deleteTexture(k.texture)}}var o=(k)=>{let J=k.split(`
-`),z=[],N=/\[(\d+):(\d+(?:\.\d+)?)\]/;return J.forEach((X)=>{let Z=X.match(N);if(Z){let _=(parseInt(Z[1])*60+parseFloat(Z[2]))*1000,q=X.replace(N,"").trim();if(q.includes("<")){let G=[],f=q.split(/(<\d+:\d+(?:\.\d+)?>)/g).filter((B)=>B.length>0),x=_,P="";f.forEach((B)=>{let A=B.match(/<(\d+):(\d+(?:\.\d+)?)>/);if(A)x=(parseInt(A[1])*60+parseFloat(A[2]))*1000;else P+=B,G.push({startTime:x,word:B})}),z.push({startTime:_,words:P.trim(),syllables:G})}else if(q)z.push({startTime:_,words:q})}}),z},l=(k)=>{let J=[],z=/<p[^>]*begin="([^"]*)"[^>]*>(.*?)<\/p>/gs,N=(Z)=>{if(!Z)return 0;let _=Z.split(":");if(_.length===3)return(parseInt(_[0])*3600+parseInt(_[1])*60+parseFloat(_[2]))*1000;if(_.length===2)return(parseInt(_[0])*60+parseFloat(_[1]))*1000;if(Z.endsWith("s"))return parseFloat(Z.replace("s",""))*1000;return parseFloat(Z)*1000},X;while((X=z.exec(k))!==null){let Z=N(X[1]),_=X[2],q=[],G="";if(_.includes("<span")||_.includes("<s")){let x=/<(?:s|span)[^>]*begin="([^"]*)"[^>]*>([^<]*)<\/(?:s|span)>/g,P;while((P=x.exec(_))!==null){let B=N(P[1]),A=P[2].replace(/&apos;/g,"'").replace(/&amp;/g,"&").replace(/&quot;/g,'"');if(A.trim()||A===" ")q.push({startTime:B,word:A}),G+=A}}if(q.length===0)G=_.replace(/<[^>]*>/g,"").replace(/&apos;/g,"'").replace(/&quot;/g,'"');let f=G.replace(/<br\s*\/?>/gi," ").trim();if(f)J.push({startTime:Z,words:f,syllables:q.length>0?q:void 0})}return J},e=()=>{let k=Spicetify.React,{useEffect:J,useState:z,useRef:N}=k,X=z,[Z,_]=X([]),[q,G]=X(-1),[f,x]=X(!1),[P,B]=X("Establishing signal..."),[A,c]=X(""),[i,h]=X(0),v=N([]),M=N(null),S=N(null),y=N(null),j=N(null),d=async()=>{let W=Spicetify.Player.data,I=W?.track||W?.item||Spicetify.Player.track||{},C=I?.metadata||{},K=C.title||C.name||I.title||I.name||"",H=C.artist_name||C.artist||I.artist||"",D=C.image_xlarge_url||C.image_large_url||C.image_url||"";if(D.startsWith("spotify:image:"))D=`https://i.scdn.co/image/${D.split(":")[2]}`;if(c(D),!K||K.length<1)K=document.querySelector('[data-testid="now-playing-widget"] [data-testid="context-item-link"]')?.textContent||document.querySelector(".main-nowPlayingWidget-trackTitle")?.textContent||"",H=document.querySelector('[data-testid="now-playing-widget"] [data-testid="context-item-info-subtitles"]')?.textContent||document.querySelector(".main-nowPlayingWidget-trackArtists")?.textContent||"";if(!K||K.trim().length===0){B("Signal Lost: Searching Metadata..."),x(!1);return}let b=K.split("(")[0].split("-")[0].split(" feat.")[0].split(" ft.")[0].trim(),O=H.split(",")[0].split("&")[0].trim();x(!0),B(`Syncing: ${O} - ${b}`);let L=async()=>{let Q=`https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(b+" "+O)}`,$;try{$=await fetch(Q,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}}).then((V)=>V.json())}catch(V){$=await Spicetify.CosmosAsync.get(Q,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"})}let E=$?.results||$?.data||$?.items;if(Array.isArray($)&&$.length>0)E=$;else if(!E&&typeof $==="object")Object.keys($).forEach((V)=>{if(Array.isArray($[V]))E=$[V]});if(E&&E.length>0){let Y=`https://lyrics.paxsenix.org/apple-music/lyrics?id=${E[0].id}&ttml=true`,F="";try{let w=await fetch(Y,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}});if(!w.ok)throw Error("AM Fetch Error");F=await w.text();try{let U=JSON.parse(F);if(typeof U==="string")F=U;else if(U.ttml||U.lyrics)F=U.ttml||U.lyrics}catch(U){}}catch(w){let U=await Spicetify.CosmosAsync.get(Y,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"});F=typeof U==="string"?U:U.ttml||U.lyrics||JSON.stringify(U)}let p=l(F);if(p.length>0)return{parsed:p,source:"Apple Music TTML"}}throw Error("No Apple Music match")},r=async()=>{let Q=`https://lyrics.paxsenix.org/musixmatch/lyrics?t=${encodeURIComponent(b)}&a=${encodeURIComponent(O)}&type=word`,$="";try{let V=await fetch(Q,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}});if(!V.ok)throw Error("MXM Fetch Error");$=await V.text();try{let Y=JSON.parse($);if(typeof Y==="string")$=Y;else if(Y.lyrics)$=Y.lyrics;else if(Y.text)$=Y.text}catch(Y){}}catch(V){let Y=await Spicetify.CosmosAsync.get(Q,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"});$=typeof Y==="string"?Y:Y.lyrics||Y.text||JSON.stringify(Y)}let E=o($);if(E.length>0)return{parsed:E,source:"Musixmatch Word-Sync"};throw Error("No MXM word match")},g=async()=>{let Q=await Spicetify.CosmosAsync.get(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(O)}&track_name=${encodeURIComponent(b)}`);if(Q&&Q.length>0){let $=o(Q[0].syncedLyrics||Q[0].plainLyrics||"");if($.length>0)return{parsed:$,source:"LRCLIB"}}throw Error("No LRCLIB match")},a=async()=>{let Q=I.uri?.split(":")[2];if(!Q)throw Error("No track ID");let $;try{$=await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/color-lyrics/v2/track/${Q}`)}catch(E){throw Error("Spotify Color-Lyrics API Error")}if($&&$.lyrics&&$.lyrics.lines){let E=$.lyrics.lines.map((V)=>{let Y=V.syllables?V.syllables.map((F)=>({startTime:parseInt(F.startTimeMs||"0"),word:F.word||F.character||F.text||""})):void 0;return{startTime:parseInt(V.startTimeMs||"0"),words:V.words||"",syllables:Y&&Y.length>0?Y:void 0}});if(E.length>0)return{parsed:E,source:$.lyrics.syncType==="SYLLABLE_SYNCED"?"Spotify Word-Sync":"Spotify"}}throw Error("No Spotify match")},m=!1,n=!1,T=(Q)=>{if(m)return;if(Q.source==="Apple Music TTML"||Q.source==="Musixmatch Word-Sync"||Q.source==="Spotify Word-Sync")m=!0;n=!0,_(Q.parsed),v.current=Q.parsed,B(`Signal Active (${Q.source})`)},s=[a().then(T),L().then(T),r().then(T),g().then(T)];Promise.allSettled(s).then(()=>{if(!n)B("Database record empty for this track."),_([]),v.current=[];x(!1)})};return J(()=>{let W,I=()=>{let C=Spicetify.Player.getProgress(),K=v.current;if(K.length>0){let H=-1;for(let D=0;D<K.length;D++)if(C>=K[D].startTime)H=D;else break;if(H!==-1&&M.current){if(H!==q){G(H);let b=M.current.children[H];if(b){let O=M.current.parentElement?.clientHeight||0,L=b.offsetTop-O/2+b.clientHeight/2;h(-L)}}let D=M.current.children[H];if(D&&D.classList.contains("word-synced"))D.querySelectorAll(".vapor-syllable").forEach((O)=>{let L=parseInt(O.getAttribute("data-time")||"0");if(C>=L)O.classList.add("synced");else O.classList.remove("synced")})}}W=requestAnimationFrame(I)};return W=requestAnimationFrame(I),()=>cancelAnimationFrame(W)},[q]),J(()=>{let W=(K,H=!1)=>{let D=Spicetify.Player.data?.track?.uri||Spicetify.Player.track?.uri||"unknown";if(H||K||D!==S.current)S.current=D,G(-1),h(0),d()},I="vapor-lyrics-styles";if(!document.getElementById("vapor-lyrics-styles")){let K=document.createElement("style");K.id="vapor-lyrics-styles",K.innerHTML=R,document.head.appendChild(K)}Spicetify.Player.addEventListener("songchange",W);let C=setInterval(()=>W(null,!1),3000);return W(null,!0),()=>{clearInterval(C),Spicetify.Player.removeEventListener("songchange",W)}},[]),J(()=>{if(y.current&&!j.current)j.current=new u(y.current),j.current.start();return()=>{if(j.current)j.current.dispose(),j.current=null}},[]),J(()=>{if(j.current&&A)j.current.loadImage(A).catch((W)=>console.log("Kawarp load error:",W))},[A]),k.createElement("div",{id:"vapor-lyrics-app-container",style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"hidden",zIndex:100}},[k.createElement("div",{className:"vapor-background",key:"bg"},[k.createElement("canvas",{key:"canvas",ref:y,style:{width:"100%",height:"100%",position:"absolute",top:0,left:0}})]),k.createElement("div",{className:"vapor-content",key:"content"},[k.createElement("header",{className:"vapor-header",key:"header"},[k.createElement("h1",{className:"vapor-title",key:"title"},"ＶＡＰＯＲ  ＬＹＲＩＣＳ")]),k.createElement("main",{className:"vapor-lyrics-container",key:"main"},[k.createElement("div",{className:"vapor-lyrics-scroll",key:"scroll",ref:M,style:{transform:`translate3d(0, ${i}px, 0)`}},f?[k.createElement("p",{className:"vapor-lyric-line active",key:"l"},"Establishing aesthetic uplink...")]:Z.length>0?Z.map((W,I)=>{let C=I<Z.length-1?Z[I+1].startTime-W.startTime:3000,K="";if(I===q)K="active";else if(q!==-1&&I<q)K="played";let H=W.syllables&&W.syllables.length>0;return k.createElement("p",{className:`vapor-lyric-line ${K} ${H?"word-synced":""}`,key:I,style:{"--line-duration":`${C}ms`}},H?W.syllables.map((D,b)=>k.createElement("span",{className:"vapor-syllable",key:b,"data-time":D.startTime},D.word)):W.words)}):[k.createElement("p",{className:"vapor-lyric-line",key:"i"},P==="Establishing signal..."?"Initializing signal...":P)])]),k.createElement("div",{className:"vapor-debug-status",key:"st",onClick:()=>{S.current=null,d()}},P)])])};(function k(){let{Playbar:J,Platform:z,ReactDOM:N,React:X,CosmosAsync:Z}=Spicetify;if(!J||!z||!N||!X||!Z){setTimeout(k,500);return}function _(){let q=document.querySelector(".main-view-container__scroll-node-child")||document.querySelector("main");if(!q)return;let G=document.getElementById("vapor-lyrics-mount-root");if(!G)G=document.createElement("div"),G.id="vapor-lyrics-mount-root",q.innerHTML="",q.appendChild(G);N.render(X.createElement(e),G)}if(z.History.listen(({pathname:q})=>{if(q.includes("vapor-lyrics"))setTimeout(_,100);else{let G=document.getElementById("vapor-lyrics-mount-root");if(G)G.remove()}}),z.History.location.pathname.includes("vapor-lyrics"))_();new J.Button("Vapor Lyrics",'<svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M12 1h-1v11h1V1zM5 1H4v11h1V1zM15 4h-1v5h1V4zM2 4H1v5h1V4zM9 0H7v14h2V0z"></path></svg>',()=>{if(z.History.location.pathname.includes("vapor-lyrics"))z.History.goBack();else z.History.push("/vapor-lyrics")},!1,!1)})();
+`),this.attribs={position:k.getAttribLocation(this.blurProgram,"a_position"),texCoord:k.getAttribLocation(this.blurProgram,"a_texCoord")},this.uniforms={blur:{resolution:k.getUniformLocation(this.blurProgram,"u_resolution"),texture:k.getUniformLocation(this.blurProgram,"u_texture"),offset:k.getUniformLocation(this.blurProgram,"u_offset")},blend:{texture1:k.getUniformLocation(this.blendProgram,"u_texture1"),texture2:k.getUniformLocation(this.blendProgram,"u_texture2"),blend:k.getUniformLocation(this.blendProgram,"u_blend")},warp:{texture:k.getUniformLocation(this.warpProgram,"u_texture"),time:k.getUniformLocation(this.warpProgram,"u_time"),intensity:k.getUniformLocation(this.warpProgram,"u_intensity")},tint:{texture:k.getUniformLocation(this.tintProgram,"u_texture"),tintColor:k.getUniformLocation(this.tintProgram,"u_tintColor"),tintIntensity:k.getUniformLocation(this.tintProgram,"u_tintIntensity")},output:{texture:k.getUniformLocation(this.outputProgram,"u_texture"),saturation:k.getUniformLocation(this.outputProgram,"u_saturation"),dithering:k.getUniformLocation(this.outputProgram,"u_dithering"),time:k.getUniformLocation(this.outputProgram,"u_time"),scale:k.getUniformLocation(this.outputProgram,"u_scale"),resolution:k.getUniformLocation(this.outputProgram,"u_resolution")}},this.positionBuffer=this.createBuffer(new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1])),this.texCoordBuffer=this.createBuffer(new Float32Array([0,0,1,0,0,1,0,1,1,0,1,1])),this.sourceTexture=this.createTexture(),this.blurFBO1=this.createFramebuffer(128,128,!0),this.blurFBO2=this.createFramebuffer(128,128,!0),this.currentAlbumFBO=this.createFramebuffer(128,128,!0),this.nextAlbumFBO=this.createFramebuffer(128,128,!0),this.warpFBO=this.createFramebuffer(1,1,!0),this.resize()}get warpIntensity(){return this._warpIntensity}set warpIntensity(z){this._warpIntensity=Math.max(0,Math.min(1,z))}get blurPasses(){return this._blurPasses}set blurPasses(z){let b=Math.max(1,Math.min(40,Math.floor(z)));if(b!==this._blurPasses){if(this._blurPasses=b,this.hasImage)this.reblurCurrentImage()}}get animationSpeed(){return this._targetAnimationSpeed}set animationSpeed(z){this._targetAnimationSpeed=Math.max(0.1,Math.min(5,z))}get transitionDuration(){return this._transitionDuration}set transitionDuration(z){this._transitionDuration=Math.max(0,Math.min(5000,z))}get saturation(){return this._saturation}set saturation(z){this._saturation=Math.max(0,Math.min(3,z))}get tintColor(){return this._tintColor}set tintColor(z){let b=z.map((f)=>Math.max(0,Math.min(1,f)));if(b.some((f,J)=>f!==this._tintColor[J])){if(this._tintColor=b,this.hasImage)this.reblurCurrentImage()}}get tintIntensity(){return this._tintIntensity}set tintIntensity(z){let b=Math.max(0,Math.min(1,z));if(b!==this._tintIntensity){if(this._tintIntensity=b,this.hasImage)this.reblurCurrentImage()}}get dithering(){return this._dithering}set dithering(z){this._dithering=Math.max(0,Math.min(0.1,z))}get scale(){return this._scale}set scale(z){this._scale=Math.max(0.01,Math.min(4,z))}setOptions(z){if(z.warpIntensity!==void 0)this.warpIntensity=z.warpIntensity;if(z.blurPasses!==void 0)this.blurPasses=z.blurPasses;if(z.animationSpeed!==void 0)this.animationSpeed=z.animationSpeed;if(z.transitionDuration!==void 0)this.transitionDuration=z.transitionDuration;if(z.saturation!==void 0)this.saturation=z.saturation;if(z.tintColor!==void 0)this.tintColor=z.tintColor;if(z.tintIntensity!==void 0)this.tintIntensity=z.tintIntensity;if(z.dithering!==void 0)this.dithering=z.dithering;if(z.scale!==void 0)this.scale=z.scale}getOptions(){return{warpIntensity:this._warpIntensity,blurPasses:this._blurPasses,animationSpeed:this._targetAnimationSpeed,transitionDuration:this._transitionDuration,saturation:this._saturation,tintColor:this._tintColor,tintIntensity:this._tintIntensity,dithering:this._dithering,scale:this._scale}}loadImage(z){return new Promise((b,k)=>{let f=new Image;f.crossOrigin="anonymous",f.onload=()=>{this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,this.gl.RGBA,this.gl.UNSIGNED_BYTE,f),this.processNewImage(),b()},f.onerror=()=>k(Error(`Failed to load image: ${z}`)),f.src=z})}loadImageElement(z){this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,this.gl.RGBA,this.gl.UNSIGNED_BYTE,z),this.processNewImage()}loadImageData(z,b,k){this.gl.bindTexture(this.gl.TEXTURE_2D,this.sourceTexture),this.gl.texImage2D(this.gl.TEXTURE_2D,0,this.gl.RGBA,b,k,0,this.gl.RGBA,this.gl.UNSIGNED_BYTE,z instanceof Uint8ClampedArray?new Uint8Array(z.buffer):z),this.processNewImage()}loadFromImageData(z){this.loadImageData(z.data,z.width,z.height)}async loadBlob(z){let b=await createImageBitmap(z);this.loadImageElement(b),b.close()}loadBase64(z){let b=z.startsWith("data:")?z:`data:image/png;base64,${z}`;return this.loadImage(b)}async loadArrayBuffer(z,b="image/png"){let k=new Blob([z],{type:b});return this.loadBlob(k)}loadGradient(z,b=135){let f=document.createElement("canvas");f.width=512,f.height=512;let J=f.getContext("2d");if(!J)return;let X=b*Math.PI/180,_=256-Math.cos(X)*512,$=256-Math.sin(X)*512,K=256+Math.cos(X)*512,F=256+Math.sin(X)*512,A=J.createLinearGradient(_,$,K,F);z.forEach((E,B)=>{A.addColorStop(B/(z.length-1),E)}),J.fillStyle=A,J.fillRect(0,0,512,512),this.loadImageElement(f)}processNewImage(){[this.currentAlbumFBO,this.nextAlbumFBO]=[this.nextAlbumFBO,this.currentAlbumFBO],this.blurSourceInto(this.nextAlbumFBO),this.hasImage=!0,this.isTransitioning=!0,this.transitionStartTime=performance.now()}reblurCurrentImage(){this.blurSourceInto(this.nextAlbumFBO)}blurSourceInto(z){let b=this.gl;b.useProgram(this.tintProgram),this.setupAttributes(),b.bindFramebuffer(b.FRAMEBUFFER,this.blurFBO1.framebuffer),b.viewport(0,0,128,128),b.activeTexture(b.TEXTURE0),b.bindTexture(b.TEXTURE_2D,this.sourceTexture),b.uniform1i(this.uniforms.tint.texture,0),b.uniform3fv(this.uniforms.tint.tintColor,this._tintColor),b.uniform1f(this.uniforms.tint.tintIntensity,this._tintIntensity),b.drawArrays(b.TRIANGLES,0,6),b.useProgram(this.blurProgram),this.setupAttributes(),b.uniform2f(this.uniforms.blur.resolution,128,128),b.uniform1i(this.uniforms.blur.texture,0);let k=this.blurFBO1,f=this.blurFBO2;for(let J=0;J<this._blurPasses;J++)b.bindFramebuffer(b.FRAMEBUFFER,f.framebuffer),b.viewport(0,0,128,128),b.bindTexture(b.TEXTURE_2D,k.texture),b.uniform1f(this.uniforms.blur.offset,J+0.5),b.drawArrays(b.TRIANGLES,0,6),[k,f]=[f,k];b.bindFramebuffer(b.FRAMEBUFFER,z.framebuffer),b.viewport(0,0,128,128),b.bindTexture(b.TEXTURE_2D,k.texture),b.uniform1f(this.uniforms.blur.offset,0),b.drawArrays(b.TRIANGLES,0,6)}resize(){let z=this.canvas.width,b=this.canvas.height;if(this.warpFBO)this.deleteFramebuffer(this.warpFBO);this.warpFBO=this.createFramebuffer(z,b,!0)}start(){if(this.isPlaying)return;this.isPlaying=!0,this.lastFrameTime=performance.now(),requestAnimationFrame(this.renderLoop)}stop(){if(this.isPlaying=!1,this.animationId!==null)cancelAnimationFrame(this.animationId),this.animationId=null}renderFrame(z){let b=performance.now();if(z!==void 0)this.render(z,b);else{let k=(b-this.lastFrameTime)/1000;this.lastFrameTime=b,this._animationSpeed+=(this._targetAnimationSpeed-this._animationSpeed)*0.05,this.accumulatedTime+=k*this._animationSpeed,this.render(this.accumulatedTime,b)}}dispose(){this.stop();let z=this.gl;z.deleteProgram(this.blurProgram),z.deleteProgram(this.blendProgram),z.deleteProgram(this.tintProgram),z.deleteProgram(this.warpProgram),z.deleteProgram(this.outputProgram),z.deleteBuffer(this.positionBuffer),z.deleteBuffer(this.texCoordBuffer),z.deleteTexture(this.sourceTexture),this.deleteFramebuffer(this.blurFBO1),this.deleteFramebuffer(this.blurFBO2),this.deleteFramebuffer(this.currentAlbumFBO),this.deleteFramebuffer(this.nextAlbumFBO),this.deleteFramebuffer(this.warpFBO)}renderLoop=(z)=>{if(!this.isPlaying)return;let b=(z-this.lastFrameTime)/1000;this.lastFrameTime=z,this._animationSpeed+=(this._targetAnimationSpeed-this._animationSpeed)*0.05,this.accumulatedTime+=b*this._animationSpeed,this.render(this.accumulatedTime,z),this.animationId=requestAnimationFrame(this.renderLoop)};render(z,b=performance.now()){let k=this.gl,f=this.canvas.width,J=this.canvas.height,X=1;if(this.isTransitioning){let $=b-this.transitionStartTime;if(X=Math.min(1,$/this._transitionDuration),X>=1)this.isTransitioning=!1}let _;if(this.isTransitioning&&X<1)k.useProgram(this.blendProgram),this.setupAttributes(),k.bindFramebuffer(k.FRAMEBUFFER,this.blurFBO1.framebuffer),k.viewport(0,0,128,128),k.activeTexture(k.TEXTURE0),k.bindTexture(k.TEXTURE_2D,this.currentAlbumFBO.texture),k.uniform1i(this.uniforms.blend.texture1,0),k.activeTexture(k.TEXTURE1),k.bindTexture(k.TEXTURE_2D,this.nextAlbumFBO.texture),k.uniform1i(this.uniforms.blend.texture2,1),k.uniform1f(this.uniforms.blend.blend,X),k.drawArrays(k.TRIANGLES,0,6),_=this.blurFBO1.texture,k.useProgram(this.warpProgram),this.setupAttributes(),k.bindFramebuffer(k.FRAMEBUFFER,this.warpFBO.framebuffer),k.viewport(0,0,f,J),k.activeTexture(k.TEXTURE0),k.bindTexture(k.TEXTURE_2D,_),k.uniform1i(this.uniforms.warp.texture,0),k.uniform1f(this.uniforms.warp.time,z),k.uniform1f(this.uniforms.warp.intensity,this._warpIntensity),k.drawArrays(k.TRIANGLES,0,6),k.useProgram(this.outputProgram),this.setupAttributes(),k.bindFramebuffer(k.FRAMEBUFFER,null),k.viewport(0,0,f,J),k.bindTexture(k.TEXTURE_2D,this.warpFBO.texture),k.uniform1i(this.uniforms.output.texture,0),k.uniform1f(this.uniforms.output.saturation,this._saturation),k.uniform1f(this.uniforms.output.dithering,this._dithering),k.uniform1f(this.uniforms.output.time,z),k.uniform1f(this.uniforms.output.scale,this._scale),k.uniform2f(this.uniforms.output.resolution,f,J),k.drawArrays(k.TRIANGLES,0,6);else k.useProgram(this.warpProgram),this.setupAttributes(),k.bindFramebuffer(k.FRAMEBUFFER,this.warpFBO.framebuffer),k.viewport(0,0,f,J),k.activeTexture(k.TEXTURE0),k.bindTexture(k.TEXTURE_2D,this.nextAlbumFBO.texture),k.uniform1i(this.uniforms.warp.texture,0),k.uniform1f(this.uniforms.warp.time,z),k.uniform1f(this.uniforms.warp.intensity,this._warpIntensity),k.drawArrays(k.TRIANGLES,0,6),k.useProgram(this.outputProgram),this.setupAttributes(),k.bindFramebuffer(k.FRAMEBUFFER,null),k.viewport(0,0,f,J),k.bindTexture(k.TEXTURE_2D,this.warpFBO.texture),k.uniform1i(this.uniforms.output.texture,0),k.uniform1f(this.uniforms.output.saturation,this._saturation),k.uniform1f(this.uniforms.output.dithering,this._dithering),k.uniform1f(this.uniforms.output.time,z),k.uniform1f(this.uniforms.output.scale,this._scale),k.uniform2f(this.uniforms.output.resolution,f,J),k.drawArrays(k.TRIANGLES,0,6)}setupAttributes(){let z=this.gl;z.bindBuffer(z.ARRAY_BUFFER,this.positionBuffer),z.enableVertexAttribArray(this.attribs.position),z.vertexAttribPointer(this.attribs.position,2,z.FLOAT,!1,0,0),z.bindBuffer(z.ARRAY_BUFFER,this.texCoordBuffer),z.enableVertexAttribArray(this.attribs.texCoord),z.vertexAttribPointer(this.attribs.texCoord,2,z.FLOAT,!1,0,0)}createShader(z,b){let k=this.gl,f=k.createShader(z);if(!f)throw Error("Failed to create shader");if(k.shaderSource(f,b),k.compileShader(f),!k.getShaderParameter(f,k.COMPILE_STATUS)){let J=k.getShaderInfoLog(f);throw k.deleteShader(f),Error(`Shader compile error: ${J}`)}return f}createProgram(z,b){let k=this.gl,f=this.createShader(k.VERTEX_SHADER,z),J=this.createShader(k.FRAGMENT_SHADER,b),X=k.createProgram();if(!X)throw Error("Failed to create program");if(k.attachShader(X,f),k.attachShader(X,J),k.linkProgram(X),!k.getProgramParameter(X,k.LINK_STATUS)){let _=k.getProgramInfoLog(X);throw k.deleteProgram(X),Error(`Program link error: ${_}`)}return k.deleteShader(f),k.deleteShader(J),X}createBuffer(z){let b=this.gl,k=b.createBuffer();if(!k)throw Error("Failed to create buffer");return b.bindBuffer(b.ARRAY_BUFFER,k),b.bufferData(b.ARRAY_BUFFER,z,b.STATIC_DRAW),k}createTexture(){let z=this.gl,b=z.createTexture();if(!b)throw Error("Failed to create texture");return z.bindTexture(z.TEXTURE_2D,b),z.texParameteri(z.TEXTURE_2D,z.TEXTURE_WRAP_S,z.CLAMP_TO_EDGE),z.texParameteri(z.TEXTURE_2D,z.TEXTURE_WRAP_T,z.CLAMP_TO_EDGE),z.texParameteri(z.TEXTURE_2D,z.TEXTURE_MIN_FILTER,z.LINEAR),z.texParameteri(z.TEXTURE_2D,z.TEXTURE_MAG_FILTER,z.LINEAR),b}createFramebuffer(z,b,k=!1){let f=this.gl,J=this.createTexture(),_=k&&this.halfFloatExt&&this.halfFloatLinearExt?this.halfFloatExt.HALF_FLOAT_OES:f.UNSIGNED_BYTE;f.texImage2D(f.TEXTURE_2D,0,f.RGBA,z,b,0,f.RGBA,_,null);let $=f.createFramebuffer();if(!$)throw Error("Failed to create framebuffer");return f.bindFramebuffer(f.FRAMEBUFFER,$),f.framebufferTexture2D(f.FRAMEBUFFER,f.COLOR_ATTACHMENT0,f.TEXTURE_2D,J,0),{framebuffer:$,texture:J}}deleteFramebuffer(z){this.gl.deleteFramebuffer(z.framebuffer),this.gl.deleteTexture(z.texture)}}var m=(z)=>{let b=z.split(`
+`),k=[],f=/\[(\d+):(\d+(?:\.\d+)?)\]/;return b.forEach((J)=>{let X=J.match(f);if(X){let _=(parseInt(X[1])*60+parseFloat(X[2]))*1000,$=J.replace(f,"").trim();if($.includes("<")){let K=[],F=$.split(/(<\d+:\d+(?:\.\d+)?>)/g).filter((B)=>B.length>0),A=_,E="";F.forEach((B)=>{let U=B.match(/<(\d+):(\d+(?:\.\d+)?)>/);if(U)A=(parseInt(U[1])*60+parseFloat(U[2]))*1000;else E+=B,K.push({startTime:A,word:B})}),k.push({startTime:_,words:E.trim(),syllables:K})}else if($)k.push({startTime:_,words:$})}}),k},K0=(z)=>{let b=[],k=/<p[^>]*begin="([^"]*)"[^>]*>(.*?)<\/p>/gs,f=(X)=>{if(!X)return 0;let _=X.split(":");if(_.length===3)return(parseInt(_[0])*3600+parseInt(_[1])*60+parseFloat(_[2]))*1000;if(_.length===2)return(parseInt(_[0])*60+parseFloat(_[1]))*1000;if(X.endsWith("s"))return parseFloat(X.replace("s",""))*1000;return parseFloat(X)*1000},J;while((J=k.exec(z))!==null){let X=f(J[1]),_=J[2],$=[],K="";if(_.includes("<span")||_.includes("<s")){let A=/<(?:s|span)[^>]*begin="([^"]*)"[^>]*>([^<]*)<\/(?:s|span)>/g,E;while((E=A.exec(_))!==null){let B=f(E[1]),U=E[2].replace(/&apos;/g,"'").replace(/&amp;/g,"&").replace(/&quot;/g,'"');if(U.trim()||U===" ")$.push({startTime:B,word:U}),K+=U}}if($.length===0)K=_.replace(/<[^>]*>/g,"").replace(/&apos;/g,"'").replace(/&quot;/g,'"');let F=K.replace(/<br\s*\/?>/gi," ").trim();if(F)b.push({startTime:X,words:F,syllables:$.length>0?$:void 0})}return b},N0=()=>{let z=Spicetify.React,{useEffect:b,useState:k,useRef:f}=z,J=k,[X,_]=J([]),[$,K]=J(-1),[F,A]=J(!1),[E,B]=J("Establishing signal..."),[U,k0]=J(""),[z0,i]=J(0),n=f([]),L=f(null),o=f(null),u=f(null),v=f(null),R=async()=>{let Y=Spicetify.Player.data,H=Y?.track||Y?.item||Spicetify.Player.track||{},I=H?.metadata||{},N=I.title||I.name||H.title||H.name||"",x=I.artist_name||I.artist||H.artist||"",D=I.image_xlarge_url||I.image_large_url||I.image_url||"";if(D.startsWith("spotify:image:"))D=`https://i.scdn.co/image/${D.split(":")[2]}`;if(k0(D),!N||N.length<1)N=document.querySelector('[data-testid="now-playing-widget"] [data-testid="context-item-link"]')?.textContent||document.querySelector(".main-nowPlayingWidget-trackTitle")?.textContent||"",x=document.querySelector('[data-testid="now-playing-widget"] [data-testid="context-item-info-subtitles"]')?.textContent||document.querySelector(".main-nowPlayingWidget-trackArtists")?.textContent||"";if(!N||N.trim().length===0){B("Signal Lost: Searching Metadata..."),A(!1);return}let P=N.split("(")[0].split("-")[0].split(" feat.")[0].split(" ft.")[0].trim(),O=x.split(",")[0].split("&")[0].trim();A(!0),B(`Syncing: ${O} - ${P}`);let M=async()=>{let G=`https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(P+" "+O)}`,Z;try{Z=await fetch(G,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}}).then((Q)=>Q.json())}catch(Q){Z=await Spicetify.CosmosAsync.get(G,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"})}let W=Z?.results||Z?.data||Z?.items;if(Array.isArray(Z)&&Z.length>0)W=Z;else if(!W&&typeof Z==="object")Object.keys(Z).forEach((Q)=>{if(Array.isArray(Z[Q]))W=Z[Q]});if(W&&W.length>0){let q=`https://lyrics.paxsenix.org/apple-music/lyrics?id=${W[0].id}&ttml=true`,C="";try{let T=await fetch(q,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}});if(!T.ok)throw Error("AM Fetch Error");C=await T.text();try{let V=JSON.parse(C);if(typeof V==="string")C=V;else if(V.ttml||V.lyrics)C=V.ttml||V.lyrics}catch(V){}}catch(T){let V=await Spicetify.CosmosAsync.get(q,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"});C=typeof V==="string"?V:V.ttml||V.lyrics||JSON.stringify(V)}let j=K0(C);if(j.length>0)return{parsed:j,source:"Apple Music TTML"}}throw Error("No Apple Music match")},b0=async()=>{let G=`https://lyrics.paxsenix.org/musixmatch/lyrics?t=${encodeURIComponent(P)}&a=${encodeURIComponent(O)}&type=word`,Z="";try{let Q=await fetch(G,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}});if(!Q.ok)throw Error("MXM Fetch Error");Z=await Q.text();try{let q=JSON.parse(Z);if(typeof q==="string")Z=q;else if(q.lyrics)Z=q.lyrics;else if(q.text)Z=q.text}catch(q){}}catch(Q){let q=await Spicetify.CosmosAsync.get(G,null,{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"});Z=typeof q==="string"?q:q.lyrics||q.text||JSON.stringify(q)}let W=m(Z);if(W.length>0)return{parsed:W,source:"Musixmatch Word-Sync"};throw Error("No MXM word match")},f0=async()=>{let G=await Spicetify.CosmosAsync.get(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(O)}&track_name=${encodeURIComponent(P)}`);if(G&&G.length>0){let Z=G[0],W=Z.syncedLyrics||Z.plainLyrics||"",Q=m(W);if(Q.length>0)return{parsed:Q,source:"LRCLIB"}}throw Error("No LRCLIB match")},J0=async()=>{let G=`https://lyrics.paxsenix.org/netease/search?q=${encodeURIComponent(O+" "+P)}`,W=(await fetch(G,{headers:{"User-Agent":"VaporLyrics/1.0 (github.com/VaporLyrics)"}}).then((S)=>S.json()))?.result?.songs?.[0]?.id;if(!W)throw Error("No NetEase match");let Q=`https://music.cyrvoid.com/lyric?id=${W}`,q=await fetch(Q).then((S)=>S.json()),C=q?.lrc?.lyric||"",j=q?.yrc?.lyric||"",V=j?((S)=>{let g=[];return S.split(`
+`).forEach((_0)=>{let h=_0.match(/\[(\d+),(\d+)\](.*)/);if(h){let a=parseInt(h[1]),t=h[3],w=[],s="",$0=/\((\d+),(\d+),\d+\)([^\(]*)/g,p;while((p=$0.exec(t))!==null){let q0=parseInt(p[1]),l=p[3];w.push({startTime:a+q0,word:l}),s+=l}g.push({startTime:a,words:w.length>0?s:t,syllables:w.length>0?w:void 0})}}),g})(j):m(C);if(V.length>0)return{parsed:V,source:j?"NetEase Word-Sync":"NetEase"};throw Error("NetEase parse failed")},X0=async()=>{let G=H.uri?.split(":")[2];if(!G)throw Error("No track ID");let Z;try{Z=await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/color-lyrics/v2/track/${G}`)}catch(W){throw Error("Spotify Color-Lyrics API Error")}if(Z&&Z.lyrics&&Z.lyrics.lines){let W=Z.lyrics.lines.map((Q)=>{let q=Q.syllables?Q.syllables.map((C)=>({startTime:parseInt(C.startTimeMs||"0"),word:C.word||C.character||C.text||""})):void 0;return{startTime:parseInt(Q.startTimeMs||"0"),words:Q.words||"",syllables:q&&q.length>0?q:void 0}});if(W.length>0)return{parsed:W,source:Z.lyrics.syncType==="SYLLABLE_SYNCED"?"Spotify Word-Sync":"Spotify"}}throw Error("No Spotify match")},c=!1,r=!1,y=(G)=>{if(c)return;if(G.source==="Apple Music TTML"||G.source==="Musixmatch Word-Sync"||G.source==="Spotify Word-Sync")c=!0;r=!0,_(G.parsed),n.current=G.parsed,B(`Signal Active (${G.source})`)},Z0=[X0().then(y),M().then(y),b0().then(y),J0().then(y),f0().then(y)];Promise.allSettled(Z0).then(()=>{if(!r)B("Database record empty for this track."),_([]),n.current=[];A(!1)})};return b(()=>{let Y,H=()=>{let I=Spicetify.Player.getProgress(),N=n.current;if(N.length>0){let x=-1;for(let D=0;D<N.length;D++)if(I>=N[D].startTime)x=D;else break;if(x!==-1&&L.current){if(x!==$){K(x);let P=L.current.children[x];if(P){let O=L.current.parentElement?.clientHeight||0,M=P.offsetTop-O/2+P.clientHeight/2;i(-M)}}let D=L.current.children[x];if(D&&D.classList.contains("word-synced"))D.querySelectorAll(".vapor-syllable").forEach((O)=>{let M=parseInt(O.getAttribute("data-time")||"0");if(I>=M)O.classList.add("synced");else O.classList.remove("synced")})}}Y=requestAnimationFrame(H)};return Y=requestAnimationFrame(H),()=>cancelAnimationFrame(Y)},[$]),b(()=>{let Y=(N,x=!1)=>{let D=Spicetify.Player.data?.track?.uri||Spicetify.Player.track?.uri||"unknown";if(x||N||D!==o.current)o.current=D,K(-1),i(0),R()},H="vapor-lyrics-styles";if(!document.getElementById("vapor-lyrics-styles")){let N=document.createElement("style");N.id="vapor-lyrics-styles",N.innerHTML=e,document.head.appendChild(N)}Spicetify.Player.addEventListener("songchange",Y);let I=setInterval(()=>Y(null,!1),3000);return Y(null,!0),()=>{clearInterval(I),Spicetify.Player.removeEventListener("songchange",Y)}},[]),b(()=>{if(u.current&&!v.current)v.current=new d(u.current),v.current.start();return()=>{if(v.current)v.current.dispose(),v.current=null}},[]),b(()=>{if(v.current&&U)v.current.loadImage(U).catch((Y)=>console.log("Kawarp load error:",Y))},[U]),z.createElement("div",{id:"vapor-lyrics-app-container",style:{position:"absolute",top:0,left:0,width:"100%",height:"100%",overflow:"hidden",zIndex:100}},[z.createElement("div",{className:"vapor-background",key:"bg"},[z.createElement("canvas",{key:"canvas",ref:u,style:{width:"100%",height:"100%",position:"absolute",top:0,left:0}})]),z.createElement("div",{className:"vapor-content",key:"content"},[z.createElement("header",{className:"vapor-header",key:"header"},[z.createElement("h1",{className:"vapor-title",key:"title"},"ＶＡＰＯＲ  ＬＹＲＩＣＳ")]),z.createElement("main",{className:"vapor-lyrics-container",key:"main"},[z.createElement("div",{className:"vapor-lyrics-scroll",key:"scroll",ref:L,style:{transform:`translate3d(0, ${z0}px, 0)`}},F?[z.createElement("p",{className:"vapor-lyric-line active",key:"l"},"Establishing aesthetic uplink...")]:X.length>0?X.map((Y,H)=>{let I=H<X.length-1?X[H+1].startTime-Y.startTime:3000,N="";if(H===$)N="active";else if($!==-1&&H<$)N="played";let x=Y.syllables&&Y.syllables.length>0;return z.createElement("p",{className:`vapor-lyric-line ${N} ${x?"word-synced":""}`,key:H,style:{"--line-duration":`${I}ms`}},x?Y.syllables.map((D,P)=>z.createElement("span",{className:"vapor-syllable",key:P,"data-time":D.startTime},D.word)):Y.words)}):[z.createElement("p",{className:"vapor-lyric-line",key:"i"},E==="Establishing signal..."?"Initializing signal...":E)])]),z.createElement("div",{className:"vapor-debug-status",key:"st",onClick:()=>{o.current=null,R()}},E),z.createElement("div",{className:"vhs-overlay",key:"vhs"})])])};(function z(){let{Playbar:b,Platform:k,ReactDOM:f,React:J,CosmosAsync:X}=Spicetify;if(!b||!k||!f||!J||!X){setTimeout(z,500);return}function _(){let $=document.querySelector(".main-view-container__scroll-node-child")||document.querySelector("main");if(!$)return;let K=document.getElementById("vapor-lyrics-mount-root");if(!K)K=document.createElement("div"),K.id="vapor-lyrics-mount-root",$.innerHTML="",$.appendChild(K);f.render(J.createElement(N0),K)}if(k.History.listen(({pathname:$})=>{if($.includes("vapor-lyrics"))setTimeout(_,100);else{let K=document.getElementById("vapor-lyrics-mount-root");if(K)K.remove()}}),k.History.location.pathname.includes("vapor-lyrics"))_();new b.Button("Vapor Lyrics",'<svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor"><path d="M12 1h-1v11h1V1zM5 1H4v11h1V1zM15 4h-1v5h1V4zM2 4H1v5h1V4zM9 0H7v14h2V0z"></path></svg>',()=>{if(k.History.location.pathname.includes("vapor-lyrics"))k.History.goBack();else k.History.push("/vapor-lyrics")},!1,!1)})();
