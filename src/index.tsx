@@ -424,6 +424,37 @@ const App = () => {
             throw new Error("No Spotify match");
         };
 
+        const getSpotifyProxy = async () => {
+            log("Attempting Spotify Lyrics API (Proxy)...");
+            const id = trackObj.uri?.split(":")[2];
+            if (!id) throw new Error("No track ID");
+            const url = `https://spotify-lyric-api-984e7b4face0.herokuapp.com/?trackid=${id}`;
+            const res = await fetch(url).then(r => r.json());
+            
+            if (res && !res.error && (res.lines || res.lyrics?.lines)) {
+                const lines = res.lines || res.lyrics.lines;
+                const syncType = res.syncType || res.lyrics?.syncType;
+                const parsed: LyricLine[] = lines.map((l: any) => {
+                    const syllables = l.syllables ? l.syllables.map((s: any) => ({
+                        startTime: parseInt(s.startTimeMs || "0"),
+                        word: s.word || s.character || s.text || ""
+                    })) : undefined;
+                    return {
+                        startTime: parseInt(l.startTimeMs || "0"),
+                        words: l.words || "",
+                        syllables: syllables && syllables.length > 0 ? syllables : undefined
+                    };
+                });
+                if (parsed.length > 0) {
+                    return { 
+                        parsed, 
+                        source: syncType === "SYLLABLE_SYNCED" ? "Spotify Proxy Word-Sync" : "Spotify Proxy" 
+                    };
+                }
+            }
+            throw new Error("Spotify Proxy failed");
+        };
+
         let bestQualityReached = false;
         let signalFound = false;
 
@@ -446,6 +477,7 @@ const App = () => {
             getSpotify().then(applyLyrics).catch(() => {}),
             getAppleMusicTTML().then(applyLyrics).catch(() => {}),
             getMusixmatchWord().then(applyLyrics).catch(() => {}),
+            getSpotifyProxy().then(applyLyrics).catch(() => {}),
             getNetEase().then(applyLyrics).catch(() => {}),
             getLrcLib().then(applyLyrics).catch(() => {})
         ];
