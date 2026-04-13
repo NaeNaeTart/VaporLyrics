@@ -198,6 +198,8 @@ const App = () => {
             
             if (amId) {
                 const lyricsUrl = `https://lyrics.paxsenix.org/apple-music/lyrics?id=${amId}&ttml=true`;
+                log(`Target AM ID: ${amId}`);
+                log(`Requesting TTML from Paxsenix...`);
                 let text = "";
                 try {
                     const res = await fetch(lyricsUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
