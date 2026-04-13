@@ -171,7 +171,10 @@ const App = () => {
                 log(`Direct ISRC lookup: ${isrc}`);
                 try {
                     const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
-                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
+                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 
+                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)',
+                        'Accept': 'application/json'
+                    });
                     
                     if (res?.message || res?.error) {
                         log(`AM Search Error: ${res.message || res.error}`, "error");
@@ -212,7 +215,10 @@ const App = () => {
                 const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
                 let searchRes;
                 try { 
-                    searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
+                    searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 
+                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)',
+                        'Accept': 'application/json'
+                    });
                 } catch (e) {
                     log("Fuzzy Search fetch failed.", "error");
                 }
@@ -251,7 +257,9 @@ const App = () => {
                 };
 
                 try {
-                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
+                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 
+                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)'
+                    });
                     text = typeof res === 'string' ? res : (res.ttml || res.lyrics || res.data?.lyrics || JSON.stringify(res));
                     text = processAmResponse(text);
                 } catch (e) {
