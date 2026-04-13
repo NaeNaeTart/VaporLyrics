@@ -96,24 +96,22 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   
-  filter: blur(1px) drop-shadow(0 0 0px transparent);
+  filter: none;
   transform: translate3d(0,0,0) scale(0.85);
   transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
               background-position 0.5s ease-out,
-              filter 0.5s ease,
               opacity 0.5s ease;
-  will-change: transform, background-position, filter, opacity;
+  will-change: transform, background-position, opacity;
 }
 
 .vapor-lyric-line.active {
   background-position: top;
   opacity: 1;
   transform: translate3d(0,0,0) scale(1.15);
-  filter: blur(0) drop-shadow(0 0 10px rgba(1, 205, 254, 0.8));
+  filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.6));
   /* Dynamic Karaoke Wipe Duration */
   transition: transform 0.5s cubic-bezier(0.19, 1, 0.22, 1), 
               background-position var(--line-duration, 0.5s) linear,
-              filter 0.5s ease,
               opacity 0.5s ease;
 }
 
@@ -121,7 +119,7 @@
   background-position: top;
   opacity: 0.35;
   transform: translate3d(0,0,0) scale(0.85);
-  filter: blur(1.5px) drop-shadow(0 0 0px transparent);
+  filter: none;
 }
 
 .vapor-lyric-line.placeholder {
@@ -150,14 +148,14 @@
   display: inline-block;
   opacity: 0.25;
   transition: all 0.2s cubic-bezier(0.19, 1, 0.22, 1);
-  filter: blur(1.5px);
+  filter: none;
   transform: scale(0.95);
   margin-right: 4px;
 }
 
 .vapor-syllable.synced {
   opacity: 1;
-  filter: blur(0) drop-shadow(0 0 12px var(--vapor-blue));
+  filter: drop-shadow(0 0 15px rgba(255, 255, 255, 0.8));
   transform: scale(1.1);
   color: #ffffff;
   -webkit-text-fill-color: initial;
