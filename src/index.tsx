@@ -433,7 +433,8 @@ const App = () => {
                 key: "canvas", 
                 ref: canvasRef, 
                 style: { width: "100%", height: "100%", position: "absolute", top: 0, left: 0 } 
-            })
+            }),
+            React.createElement("div", { className: "vhs-overlay", key: "vhs" })
         ]),
         React.createElement("div", { className: "vapor-content", key: "content" }, [
             React.createElement("header", { className: "vapor-header", key: "header" }, [
@@ -476,8 +477,7 @@ const App = () => {
                 className: "vapor-debug-status", 
                 key: "st",
                 onClick: () => { trackRef.current = null; fetchLyrics(); }
-            }, status),
-            React.createElement("div", { className: "vhs-overlay", key: "vhs" })
+            }, status)
         ])
     ]);
 };

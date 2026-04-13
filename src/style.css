@@ -177,7 +177,7 @@
               linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
   background-size: 100% 3px, 3px 100%;
   pointer-events: none;
-  z-index: 1000;
+  z-index: 1; /* Drop below content */
   opacity: 0.4;
 }
 
@@ -197,7 +197,7 @@ body:has(#vapor-lyrics-mount-root) .main-view-container__scroll-node-child {
   right: 0;
   background: rgba(18, 16, 16, 0.03);
   opacity: 0;
-  z-index: 1000;
+  z-index: 1; /* Ensure same layer as vhs if needed, but below content */
   pointer-events: none;
   animation: vhs-flicker 0.1s infinite;
 }
