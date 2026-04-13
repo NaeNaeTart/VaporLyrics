@@ -106,12 +106,23 @@ const App = () => {
     const [coverArt, setCoverArt] = useStateTyped("");
     
     const [transformY, setTransformY] = useStateTyped(0);
+    const [debugLogs, setDebugLogs] = useStateTyped<string[]>([]);
+    const [showDebug, setShowDebug] = useStateTyped(false);
     
     const lyricsRef = useRef([] as LyricLine[]);
     const containerRef = useRef(null as HTMLDivElement | null);
     const trackRef = useRef(null as string | null);
     const canvasRef = useRef(null as HTMLCanvasElement | null);
     const kawarpRef = useRef(null as any);
+
+    const log = (msg: string, type: "info" | "warn" | "error" | "success" = "info") => {
+        const time = new Date().toLocaleTimeString().split(' ')[0];
+        const formatted = `[${time}] ${msg}`;
+        setDebugLogs(prev => [formatted, ...prev].slice(0, 50));
+        if (type === "error") console.error(msg);
+        else if (type === "warn") console.warn(msg);
+        else console.log(msg);
+    };
 
     const fetchLyrics = async () => {
         const data = Spicetify.Player.data;
@@ -143,12 +154,14 @@ const App = () => {
         const cleanArtist = artist.split(',')[0].split('&')[0].trim();
 
         setLoading(true);
-        setStatus(`Syncing: ${cleanArtist} - ${cleanTitle}`);
-        console.group(`[Vapor Lyrics] Fetching: ${cleanArtist} - ${cleanTitle}`);
-        console.log("Metadata:", { title, artist, cleanTitle, cleanArtist, uri: trackObj.uri });
+        const metaInfo = `Syncing: ${cleanArtist} - ${cleanTitle}`;
+        setStatus(metaInfo);
+        setDebugLogs([]);
+        log(`Starting Fetch for ${cleanArtist} - ${cleanTitle}`);
+        log(`Metadata: ${title} | ${artist} | ${trackObj.uri}`);
         
         const getAppleMusicTTML = async () => {
-            console.log("Attempting Apple Music (Paxsenix)...");
+            log("Attempting Apple Music (Paxsenix)...");
             const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
             let searchRes;
             try { 
@@ -166,7 +179,7 @@ const App = () => {
             }
             if (arr && arr.length > 0) {
                 const amId = arr[0].id;
-                console.log(`Found AM Match: ${amId} (${arr[0].name})`);
+                log(`Found AM Match: ${amId} (${arr[0].name})`, "success");
                 const lyricsUrl = `https://lyrics.paxsenix.org/apple-music/lyrics?id=${amId}&ttml=true`;
                 let text = "";
                 try {
@@ -185,18 +198,17 @@ const App = () => {
 
                 const parsed = parseTTML(text);
                 if (parsed.length > 0) {
-                    console.log("Successfully parsed AM TTML");
+                    log("Successfully parsed AM TTML", "success");
                     return { parsed, source: "Apple Music TTML" };
                 }
             }
-            console.warn("Apple Music: No results or failed search.");
+            log("Apple Music: No results or failed search.", "warn");
             throw new Error("No Apple Music match");
         };
 
         const getMusixmatchWord = async () => {
-            console.log("Attempting Musixmatch (Paxsenix)...");
+            log("Attempting Musixmatch (Paxsenix)...");
             const url = `https://lyrics.paxsenix.org/musixmatch/lyrics?t=${encodeURIComponent(cleanTitle)}&a=${encodeURIComponent(cleanArtist)}&type=word`;
-            let text = "";
             try {
                 const res = await fetch(url, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
                 if (!res.ok) throw new Error("MXM Fetch Error");
@@ -216,41 +228,49 @@ const App = () => {
 
             const parsed = parseLRC(text);
             if (parsed.length > 0) {
-                console.log("Successfully parsed MXM Word-Sync");
+                log("Successfully parsed MXM Word-Sync", "success");
                 return { parsed, source: "Musixmatch Word-Sync" };
             }
-            console.warn("Musixmatch: No match found.");
+            log("Musixmatch: No match found.", "warn");
             throw new Error("No MXM word match");
         };
 
         const getLrcLib = async () => {
-            console.log("Attempting LRCLIB...");
+            log("Attempting LRCLIB...");
             const res = await Spicetify.CosmosAsync.get(`https://lrclib.net/api/search?artist_name=${encodeURIComponent(cleanArtist)}&track_name=${encodeURIComponent(cleanTitle)}`);
             if (res && res.length > 0) {
                 const item = res[0];
                 const text = item.syncedLyrics || item.plainLyrics || "";
                 const parsed = parseLRC(text);
                 if (parsed.length > 0) {
-                    console.log("Successfully parsed LRCLIB");
+                    log("Successfully parsed LRCLIB", "success");
                     return { parsed, source: "LRCLIB" };
                 }
             }
-            console.warn("LRCLIB: No results.");
+            log("LRCLIB: No results.", "warn");
             throw new Error("No LRCLIB match");
         };
 
         const getNetEase = async () => {
-            console.log("Attempting NetEase...");
+            log("Attempting NetEase...");
             const searchUrl = `https://lyrics.paxsenix.org/netease/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
-            const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'VaporLyrics/1.0 (github.com/VaporLyrics)' } }).then(r => r.json());
+            const searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json());
             const songId = searchRes?.result?.songs?.[0]?.id;
-            if (!songId) throw new Error("No NetEase match");
+            if (!songId) {
+                log("NetEase: No search results.", "warn");
+                throw new Error("No NetEase match");
+            }
 
             // We use a different proxy for the actual lyrics if Paxsenix 403s
+            log(`Found NetEase Match: ${songId}. Fetching lyrics...`);
             const lyricUrl = `https://music.cyrvoid.com/lyric?id=${songId}`;
             const res = await fetch(lyricUrl).then(r => r.json());
             const lrc = res?.lrc?.lyric || "";
             const yrc = res?.yrc?.lyric || ""; // YRC is NetEase's word-sync format
+            
+            if (!lrc && !yrc) {
+                log("NetEase: No lyrics returned for this ID.", "warn");
+            }
 
             const parseYRC = (yrc: string): LyricLine[] => {
                 const parsed: LyricLine[] = [];
@@ -282,21 +302,25 @@ const App = () => {
                 });
                 return parsed;
             };
-
             const parsed = yrc ? parseYRC(yrc) : parseLRC(lrc);
-            if (parsed.length > 0) return { parsed, source: yrc ? "NetEase Word-Sync" : "NetEase" };
+            if (parsed.length > 0) {
+                log("NetEase parsed successfully.", "success");
+                return { parsed, source: yrc ? "NetEase Word-Sync" : "NetEase" };
+            }
+            log("NetEase: Parse failed.", "error");
             throw new Error("NetEase parse failed");
         };
 
         const getSpotify = async () => {
+            log("Attempting Spotify Native...");
             const id = trackObj.uri?.split(":")[2];
             if (!id) throw new Error("No track ID");
             let res;
             try {
                 res = await Spicetify.CosmosAsync.get(`https://spclient.wg.spotify.com/color-lyrics/v2/track/${id}`);
-                console.log("Spotify Native Response:", res);
+                log(`Spotify Sync Type: ${res?.lyrics?.syncType}`, res?.lyrics?.lines ? "info" : "warn");
             } catch (e) {
-                console.warn("Spotify Native API Failed:", e);
+                log("Spotify Native API Failed.", "warn");
                 throw new Error("Spotify Color-Lyrics API Error");
             }
             if (res && res.lyrics && res.lyrics.lines) {
@@ -336,20 +360,20 @@ const App = () => {
             setLyrics(res.parsed);
             lyricsRef.current = res.parsed;
             setStatus(`Signal Active (${res.source})`);
-            console.log(`%c[Vapor Lyrics] Applied source: ${res.source}`, "color: #05ffa1; font-weight: bold;");
+            log(`Applied source: ${res.source}`, "success");
         };
 
         let fetchPromises = [
-            getSpotify().then(applyLyrics).catch(e => console.log("Spotify fallback finished.")),
-            getAppleMusicTTML().then(applyLyrics).catch(e => console.log("AM fallback finished.")),
-            getMusixmatchWord().then(applyLyrics).catch(e => console.log("MXM fallback finished.")),
-            getNetEase().then(applyLyrics).catch(e => console.log("NetEase fallback finished.")),
-            getLrcLib().then(applyLyrics).catch(e => console.log("LRCLIB fallback finished."))
+            getSpotify().then(applyLyrics).catch(() => {}),
+            getAppleMusicTTML().then(applyLyrics).catch(() => {}),
+            getMusixmatchWord().then(applyLyrics).catch(() => {}),
+            getNetEase().then(applyLyrics).catch(() => {}),
+            getLrcLib().then(applyLyrics).catch(() => {})
         ];
 
         Promise.allSettled(fetchPromises).then(() => {
-            console.groupEnd();
             if (!signalFound) {
+                log("No providers found any lyrics.", "error");
                 setStatus("Database record empty for this track.");
                 setLyrics([]);
                 lyricsRef.current = [];
@@ -498,8 +522,24 @@ const App = () => {
             React.createElement("div", { 
                 className: "vapor-debug-status", 
                 key: "st",
-                onClick: () => { trackRef.current = null; fetchLyrics(); }
-            }, status)
+                onClick: () => setShowDebug(!showDebug)
+            }, [
+                React.createElement("span", { key: "s" }, status),
+                React.createElement("span", { key: "h", style: { opacity: 0.5, marginLeft: 8 } }, "(Click for Debug)")
+            ]),
+            showDebug && React.createElement("div", { 
+                className: "vapor-debug-overlay", 
+                key: "dbg",
+                onClick: (e: any) => e.stopPropagation()
+            }, [
+                React.createElement("header", { key: "h" }, [
+                    React.createElement("h2", { key: "t" }, "Terminal Uplink"),
+                    React.createElement("button", { key: "b", onClick: () => setShowDebug(false) }, "✖")
+                ]),
+                React.createElement("div", { className: "debug-list", key: "l" }, 
+                    debugLogs.map((log, i) => React.createElement("div", { key: i, className: "debug-line" }, log))
+                )
+            ])
         ])
     ]);
 };
