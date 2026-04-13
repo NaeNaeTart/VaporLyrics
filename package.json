@@ -2,7 +2,7 @@
   "name": "vapor-lyrics",
   "version": "1.0.0",
   "author": "NaeNaeTart",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NaeNaeTart/VaporLyrics.git"
