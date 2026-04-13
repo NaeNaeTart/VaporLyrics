@@ -489,8 +489,13 @@ const App = () => {
     }
 
     function mount() {
+        const scrollNode = document.querySelector(".main-view-container__scroll-node") as HTMLElement;
         const root = document.querySelector(".main-view-container__scroll-node-child") || document.querySelector("main");
         if (!root) return;
+        
+        // Disable global scrolling
+        if (scrollNode) scrollNode.style.overflow = "hidden";
+
         let wrapper = document.getElementById("vapor-lyrics-mount-root");
         if (!wrapper) {
             wrapper = document.createElement("div");
@@ -501,10 +506,15 @@ const App = () => {
     }
 
     Platform.History.listen(({ pathname }: { pathname: string }) => {
-        if (pathname.includes("vapor-lyrics")) setTimeout(mount, 100);
-        else {
+        if (pathname.includes("vapor-lyrics")) {
+            setTimeout(mount, 100);
+        } else {
             const w = document.getElementById("vapor-lyrics-mount-root");
             if (w) w.remove();
+            
+            // Re-enable scrolling when leaving the page
+            const scrollNode = document.querySelector(".main-view-container__scroll-node") as HTMLElement;
+            if (scrollNode) scrollNode.style.overflow = "";
         }
     });
 
