@@ -212,6 +212,11 @@ const App = () => {
                     searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
                 }
                 
+                log(`Search Response keys: ${searchRes ? Object.keys(searchRes).join(", ") : "null"}`);
+                if (searchRes && !searchRes.results && !searchRes.data && !Array.isArray(searchRes)) {
+                    log(`Raw Search Sample: ${JSON.stringify(searchRes).substring(0, 100)}`, "warn");
+                }
+
                 let arr = searchRes?.results || searchRes?.data || searchRes?.items;
                 if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
                 if (arr && arr.length > 0) {
