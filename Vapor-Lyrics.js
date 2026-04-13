@@ -166,8 +166,8 @@ body:has(#vapor-lyrics-mount-root) .main-view-container__scroll-node-child {\r
   position: fixed;\r
   bottom: 80px;\r
   left: 20px;\r
-  width: 400px;\r
-  max-height: 300px;\r
+  width: 450px;\r
+  max-height: 400px;\r
   background: rgba(5, 5, 10, 0.95);\r
   border: 2px solid var(--vapor-pink);\r
   border-radius: 8px;\r
@@ -177,6 +177,8 @@ body:has(#vapor-lyrics-mount-root) .main-view-container__scroll-node-child {\r
   box-shadow: 0 0 20px rgba(255, 113, 206, 0.3);\r
   font-family: "Courier New", monospace;\r
   overflow: hidden;\r
+  user-select: text !important;\r
+  cursor: text;\r
 }\r
 \r
 .vapor-debug-overlay header {\r
