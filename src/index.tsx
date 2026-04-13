@@ -171,7 +171,7 @@ const App = () => {
                 log(`Direct ISRC lookup: ${isrc}`);
                 try {
                     const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
-                    const res = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json());
+                    const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
                     let arr = res?.results || res?.data || res?.items;
                     if (Array.isArray(res)) arr = res;
                     if (arr && arr.length > 0) {
@@ -179,7 +179,7 @@ const App = () => {
                         log(`Match found via ISRC: ${amId} (${arr[0].name})`, "success");
                     }
                 } catch (e) {
-                    log("ISRC search failed, trying Songlink...", "warn");
+                    log("ISRC search failed or blocked.", "warn");
                 }
             }
 
@@ -207,16 +207,12 @@ const App = () => {
                 const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
                 let searchRes;
                 try { 
-                    searchRes = await fetch(searchUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } }).then(r => r.json()); 
-                } catch (e) {
                     searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                } catch (e) {
+                    log("Fuzzy Search fetch failed.", "error");
                 }
                 
                 log(`Search Response keys: ${searchRes ? Object.keys(searchRes).join(", ") : "null"}`);
-                if (searchRes && !searchRes.results && !searchRes.data && !Array.isArray(searchRes)) {
-                    log(`Raw Search Sample: ${JSON.stringify(searchRes).substring(0, 100)}`, "warn");
-                }
-
                 let arr = searchRes?.results || searchRes?.data || searchRes?.items;
                 if (Array.isArray(searchRes) && searchRes.length > 0) arr = searchRes;
                 if (arr && arr.length > 0) {
@@ -247,20 +243,11 @@ const App = () => {
                 };
 
                 try {
-                    const res = await fetch(lyricsUrl, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
-                    log(`Fetch Status: ${res.status} ${res.statusText}`);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    text = await res.text();
+                    const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                    text = typeof res === 'string' ? res : (res.ttml || res.lyrics || res.data?.lyrics || JSON.stringify(res));
                     text = processAmResponse(text);
                 } catch (e) {
-                    log(`Fetch failed: ${e}. Falling back to CosmosAsync...`, "warn");
-                    try {
-                        const ttmlRes = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
-                        text = typeof ttmlRes === 'string' ? ttmlRes : (ttmlRes.ttml || ttmlRes.lyrics || ttmlRes.data?.lyrics || JSON.stringify(ttmlRes));
-                        log("CosmosAsync fetch completed.");
-                    } catch (err) {
-                        log(`CosmosAsync also failed: ${err}`, "error");
-                    }
+                    log(`Paxsenix fetch failed: ${e}`, "error");
                 }
 
                 if (text && text.includes("<tt")) {

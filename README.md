@@ -28,5 +28,5 @@ This extension is inspired by Spikerko's "Spicy Lyrics" extension.
 This project is licensed under the terms of the GNU General Public License v3.0.
 
 ## Credits
-- Paxsenix for the lyrics API
-- Songlink for the song mapping API
+- [Paxsenix](https://github.com/Paxsenix) for the lyrics API
+- [Songlink](https://songlink.io/) for the song mapping API
