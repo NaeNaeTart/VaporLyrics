@@ -4,13 +4,39 @@ import { Kawarp as KawarpCore } from "@kawarp/core";
 interface LyricSyllable {
     startTime: number;
     word: string;
+    duration?: number;
 }
 
 interface LyricLine {
     startTime: number;
+    endTime?: number;
     words: string;
     syllables?: LyricSyllable[];
+    role?: "main" | "background" | "duet";
+    agent?: string; // v1, v2, etc
 }
+
+interface VaporSettings {
+    syncOffset: number;
+    fontScale: number;
+    visualEffect: "kawarp" | "none" | "static";
+    textAlign: "center" | "left" | "right";
+    showDebugOnStart: boolean;
+    showHeader: boolean;
+    useNativeSpotify: boolean;
+    devMode: boolean;
+}
+
+const DEFAULT_SETTINGS: VaporSettings = {
+    syncOffset: 0,
+    fontScale: 1.0,
+    visualEffect: "kawarp",
+    textAlign: "center",
+    showDebugOnStart: false,
+    showHeader: true,
+    useNativeSpotify: true,
+    devMode: false,
+};
 
 const parseLRC = (lrc: string): LyricLine[] => {
     const lines = lrc.split('\n');
@@ -40,85 +66,306 @@ const parseLRC = (lrc: string): LyricLine[] => {
                     }
                 });
                 
-                parsed.push({ startTime: time, words: cleanWords.trim(), syllables });
+                let role: LyricLine["role"] = "main";
+                if (cleanWords.trim().startsWith("(") && cleanWords.trim().endsWith(")")) role = "background";
+                else if (cleanWords.includes(": ")) role = "duet";
+
+                parsed.push({ startTime: time, words: cleanWords.trim(), syllables, role });
+            } else if (wordsRaw) {
+                let role: LyricLine["role"] = "main";
+                if (wordsRaw.startsWith("(") && wordsRaw.endsWith(")")) role = "background";
+                else if (wordsRaw.includes(": ")) role = "duet";
+                parsed.push({ startTime: time, words: wordsRaw, role });
+            }
+        } else if (line.trim().length > 0 && !line.includes('[by:') && !line.includes('[ar:')) {
+            let role: LyricLine["role"] = "main";
+            let content = line.trim();
+            if (content.startsWith("(") && content.endsWith(")")) role = "background";
+            parsed.push({ startTime: 0, words: content, role });
+        }
+    });
+    const separateBackgroundVocals = (lines: LyricLine[]): LyricLine[] => {
+        const final: LyricLine[] = [];
+        lines.forEach(line => {
+            const hasParens = line.words.includes("(") || line.words.includes(")");
+            const isMixed = hasParens && !(line.words.trim().startsWith("(") && line.words.trim().endsWith(")"));
+            
+            if (isMixed && line.syllables) {
+                const mainSyllables = line.syllables.filter(s => !s.word.trim().includes("(")).map(s => ({...s}));
+                const bgSyllables = line.syllables.filter(s => s.word.trim().includes("(")).map(s => ({
+                    ...s,
+                    word: s.word.replace(/[()]/g, '').trim()
+                }));
+                
+                if (mainSyllables.length > 0) {
+                    final.push({ ...line, words: mainSyllables.map(s => s.word).join("").trim(), syllables: mainSyllables, role: line.role === "duet" ? "duet" : "main" });
+                }
+                if (bgSyllables.length > 0) {
+                    final.push({ ...line, words: bgSyllables.map(s => s.word).join("").trim(), syllables: bgSyllables, role: "background", agent: undefined });
+                }
             } else {
-                if (wordsRaw) parsed.push({ startTime: time, words: wordsRaw });
+                const cleanedLine = { ...line };
+                if (line.words.includes("(")) {
+                    cleanedLine.words = line.words.replace(/[()]/g, '').trim();
+                    if (line.syllables) {
+                        cleanedLine.syllables = line.syllables.map(s => ({
+                            ...s,
+                            word: s.word.replace(/[()]/g, '').trim()
+                        }));
+                    }
+                    cleanedLine.role = "background";
+                    cleanedLine.agent = undefined;
+                }
+                final.push(cleanedLine);
+            }
+        });
+        return final.sort((a,b) => a.startTime - b.startTime);
+    };
+
+    const finalParsed = separateBackgroundVocals(parsed);
+    finalParsed.forEach(line => {
+        if (line.syllables) {
+            for (let j = 0; j < line.syllables.length; j++) {
+                const s = line.syllables[j]!;
+                if (j < line.syllables.length - 1) s.duration = line.syllables[j+1]!.startTime - s.startTime;
+                else s.duration = Math.max(200, (line.endTime || s.startTime + 1000) - s.startTime);
             }
         }
     });
-    return parsed;
+    return finalParsed;
 };
 
 const parseTTML = (ttml: string): LyricLine[] => {
-    const parsed: LyricLine[] = [];
-    const pRegex = /<p[^>]*begin="([^"]*)"[^>]*>(.*?)<\/p>/gs;
-    
-    const timeToMs = (tStr: string) => {
-        if (!tStr) return 0;
-        const parts = tStr.split(':');
-        if (parts.length === 3) return (parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseFloat(parts[2])) * 1000;
-        if (parts.length === 2) return (parseInt(parts[0]) * 60 + parseFloat(parts[1])) * 1000;
-        if (tStr.endsWith('s')) return parseFloat(tStr.replace('s', '')) * 1000;
-        return parseFloat(tStr) * 1000;
-    };
-
-    let pMatch;
-    while ((pMatch = pRegex.exec(ttml)) !== null) {
-        const pTime = timeToMs(pMatch[1]);
-        const innerHTML = pMatch[2];
-        const syllables: LyricSyllable[] = [];
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(ttml, "text/xml");
+        const parsed: LyricLine[] = [];
         
-        let cleanWords = "";
-        if (innerHTML.includes('<span') || innerHTML.includes('<s')) {
-            const sRegex = /<(?:s|span)[^>]*begin="([^"]*)"[^>]*>([^<]*)<\/(?:s|span)>/g;
-            let sMatch;
-            while ((sMatch = sRegex.exec(innerHTML)) !== null) {
-                const sTime = timeToMs(sMatch[1]);
-                let word = sMatch[2].replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&quot;/g, '"');
-                if (word.trim() || word === " ") {
-                    syllables.push({ startTime: sTime, word });
-                    cleanWords += word;
+        const parseTime = (timeStr: string | null): number => {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':').map(parseFloat);
+            if (parts.length === 3) return (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
+            if (parts.length === 2) return (parts[0]! * 60 + parts[1]!) * 1000;
+            return parts[0]! * 1000;
+        };
+
+        const pTags = doc.getElementsByTagName("p");
+        for (let i = 0; i < pTags.length; i++) {
+            const p = pTags[i]!;
+            const pTime = parseTime(p.getAttribute("begin"));
+            const agent = p.getAttribute("ttm:agent") || "v1";
+            const roleAttr = p.getAttribute("ttm:role") || "";
+            
+            let syllables: LyricSyllable[] = [];
+            let cleanWords = "";
+
+            const processNode = (node: Node, isBg: boolean) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const text = node.textContent || "";
+                    if (text.trim().length > 0) {
+                        cleanWords += text;
+                        syllables.push({ startTime: pTime, word: text });
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    const el = node as Element;
+                    if (el.tagName === "span") {
+                        const sTime = parseTime(el.getAttribute("begin")) || pTime;
+                        const sRole = el.getAttribute("ttm:role") || "";
+                        const innerIsBg = isBg || sRole === "background" || sRole === "x-bg";
+                        
+                        let sText = "";
+                        for (let j = 0; j < el.childNodes.length; j++) {
+                            const child = el.childNodes[j]!;
+                            if (child.nodeType === Node.TEXT_NODE) sText += child.textContent;
+                            else if (child.nodeType === Node.ELEMENT_NODE && (child as Element).tagName === "span") {
+                                 sText += child.textContent;
+                            }
+                        }
+                        
+                        let word = sText;
+                        if (innerIsBg && !word.startsWith("(")) word = `(${word})`;
+
+                        // Spacing Fix: If this span doesn't end in space/hyphen, and there is more content, add a space
+                        if (!word.endsWith(" ") && !word.endsWith("-") && node.nextSibling) {
+                            const next = node.nextSibling;
+                            const nextText = next.textContent || "";
+                            if (nextText.length > 0 && !nextText.startsWith(" ") && !nextText.startsWith("-")) {
+                                word += " ";
+                            }
+                        }
+                        
+                        syllables.push({ startTime: sTime, word });
+                        cleanWords += word;
+                    } else if (el.tagName === "br") {
+                        cleanWords += " ";
+                    } else {
+                        for (let j = 0; j < el.childNodes.length; j++) {
+                            processNode(el.childNodes[j]!, isBg);
+                        }
+                    }
                 }
+            };
+
+            const isLineBg = roleAttr === "background" || roleAttr === "x-bg" || (p.textContent?.trim().startsWith("(") && p.textContent?.trim().endsWith(")"));
+            
+            const spanTags = p.getElementsByTagName("span");
+            if (spanTags.length > 0) {
+                for (let j = 0; j < p.childNodes.length; j++) {
+                    processNode(p.childNodes[j]!, isLineBg);
+                }
+            } else {
+                cleanWords = p.textContent?.trim() || "";
+                if (isLineBg && !cleanWords.startsWith("(")) cleanWords = `(${cleanWords})`;
+            }
+
+            if (cleanWords.trim()) {
+                parsed.push({ 
+                    startTime: pTime, 
+                    endTime: parseTime(p.getAttribute("end")) || pTime + 5000,
+                    words: cleanWords.trim(), 
+                    syllables: syllables.length > 0 ? syllables : undefined, 
+                    role: isLineBg ? "background" : (agent === "v2" ? "duet" : "main"),
+                    agent 
+                });
             }
         }
         
-        if (syllables.length === 0) {
-            cleanWords = innerHTML.replace(/<[^>]*>/g, '').replace(/&apos;/g, "'").replace(/&quot;/g, '"');
+        // Post-process to add end times for better tracking
+        for (let i = 0; i < parsed.length; i++) {
+            const current = parsed[i]!;
+            if (i < parsed.length - 1) current.endTime = parsed[i+1]!.startTime;
+            else current.endTime = current.startTime + 5000;
         }
-        
-        const words = cleanWords.replace(/<br\s*\/?>/gi, " ").trim();
-        if (words) {
-            parsed.push({ startTime: pTime, words, syllables: syllables.length > 0 ? syllables : undefined });
-        }
+
+        const separateBackgroundVocals = (lines: LyricLine[]): LyricLine[] => {
+            const final: LyricLine[] = [];
+            lines.forEach(line => {
+                const hasParens = line.words.includes("(") || line.words.includes(")");
+                const isMixed = hasParens && !(line.words.trim().startsWith("(") && line.words.trim().endsWith(")"));
+                
+                if (isMixed && line.syllables) {
+                    const mainSyllables = line.syllables.filter(s => !s.word.trim().includes("(")).map(s => ({...s}));
+                    const bgSyllables = line.syllables.filter(s => s.word.trim().includes("(")).map(s => ({
+                        ...s,
+                        word: s.word.replace(/[()]/g, '').trim()
+                    }));
+                    if (mainSyllables.length > 0) {
+                        const mWords = mainSyllables.map(s => s.word).join("").trim();
+                        final.push({ ...line, words: mWords, syllables: mainSyllables, role: line.role === "duet" ? "duet" : "main" });
+                    }
+                    if (bgSyllables.length > 0) {
+                        const bWords = bgSyllables.map(s => s.word).join("").trim();
+                        final.push({ ...line, words: bWords, syllables: bgSyllables, role: "background", agent: undefined });
+                    }
+                } else {
+                    const cleanedLine = { ...line };
+                    if (line.words.includes("(")) {
+                        cleanedLine.words = line.words.replace(/[()]/g, '').trim();
+                        if (line.syllables) {
+                            cleanedLine.syllables = line.syllables.map(s => ({
+                                ...s,
+                                word: s.word.replace(/[()]/g, '').trim()
+                            }));
+                        }
+                        cleanedLine.role = "background";
+                        cleanedLine.agent = undefined;
+                    }
+                    final.push(cleanedLine);
+                }
+            });
+            return final.sort((a,b) => a.startTime - b.startTime);
+        };
+
+        const finalParsed = separateBackgroundVocals(parsed);
+
+        // Calculate durations for each syllable
+        finalParsed.forEach(line => {
+            if (line.syllables) {
+                for (let j = 0; j < line.syllables.length; j++) {
+                    const s = line.syllables[j]!;
+                    if (j < line.syllables.length - 1) {
+                        s.duration = line.syllables[j+1]!.startTime - s.startTime;
+                    } else if (line.endTime) {
+                        s.duration = Math.max(200, line.endTime - s.startTime);
+                    } else {
+                        s.duration = 400;
+                    }
+                }
+            }
+        });
+
+        console.log(`[Vapor] DOM Parser: Captured ${finalParsed.length} lines (Post-separated)`);
+        return finalParsed;
+    } catch (e) {
+        console.error("[Vapor] TTML Parsing failed:", e);
+        return [];
     }
-    return parsed;
 };
 
 const App = () => {
     const React = Spicetify.React;
     const { useEffect, useState, useRef } = React;
-    const useStateTyped = useState as <T>(val: T) => [T, (val: T) => void];
+    const useStateTyped = useState as <T>(val: T | (() => T)) => [T, (val: T | ((prev: T) => T)) => void];
 
     const [lyrics, setLyrics] = useStateTyped<LyricLine[]>([]);
-    const [activeIndex, setActiveIndex] = useStateTyped(-1);
+    const [activeIndices, setActiveIndices] = useStateTyped<number[]>([]);
     const [loading, setLoading] = useStateTyped(false);
     const [status, setStatus] = useStateTyped("Establishing signal...");
     const [coverArt, setCoverArt] = useStateTyped("");
     
     const [transformY, setTransformY] = useStateTyped(0);
+    const userOffsetRef = useRef(0);
+    const isScrollingRef = useRef(false);
+    const scrollTimeoutRef = useRef(null as any);
+    
     const [debugLogs, setDebugLogs] = useStateTyped<string[]>([]);
     const [showDebug, setShowDebug] = useStateTyped(false);
+    const [showSettings, setShowSettings] = useStateTyped(false);
     
+    const [settings, setSettings] = useStateTyped<VaporSettings>(() => {
+        const saved = Spicetify.LocalStorage.get("vapor-lyrics-settings");
+        if (saved) {
+            try { 
+                const obj = JSON.parse(saved);
+                return { ...DEFAULT_SETTINGS, ...obj }; 
+            } catch (e) {}
+        }
+        return DEFAULT_SETTINGS;
+    });
+
+    const settingsRef = useRef(settings);
+    useEffect(() => {
+        settingsRef.current = settings;
+        Spicetify.LocalStorage.set("vapor-lyrics-settings", JSON.stringify(settings));
+    }, [settings]);
+
+    useEffect(() => {
+        if (settings.showDebugOnStart) setShowDebug(true);
+    }, []);
+
     const lyricsRef = useRef([] as LyricLine[]);
     const containerRef = useRef(null as HTMLDivElement | null);
     const trackRef = useRef(null as string | null);
     const canvasRef = useRef(null as HTMLCanvasElement | null);
     const kawarpRef = useRef(null as any);
+    const manualLyricsRef = useRef(null as LyricLine[] | null);
+    const activeIndicesRef = useRef([] as number[]); // RAF-safe active tracking
+    const transformYRef = useRef(0); // Avoids 60fps React re-renders
+    
+    const getManualStore = () => {
+        try { return JSON.parse(Spicetify.LocalStorage.get("vapor-manual-store") || "{}"); }
+        catch { return {}; }
+    };
+    const saveManualLyric = (uri: string, lyrics: LyricLine[]) => {
+        const store = getManualStore();
+        store[uri] = lyrics;
+        Spicetify.LocalStorage.set("vapor-manual-store", JSON.stringify(store));
+    };
 
     const log = (msg: string, type: "info" | "warn" | "error" | "success" = "info") => {
         const time = new Date().toLocaleTimeString().split(' ')[0];
         const formatted = `[${time}] ${msg}`;
-        setDebugLogs(prev => [formatted, ...prev].slice(0, 50));
+        setDebugLogs((prev: string[]) => [formatted, ...prev].slice(0, 50));
         if (type === "error") console.error(msg);
         else if (type === "warn") console.warn(msg);
         else console.log(msg);
@@ -159,6 +406,26 @@ const App = () => {
         setDebugLogs([]);
         log(`Starting Fetch for ${cleanArtist} - ${cleanTitle}`);
         log(`Metadata: ${title} | ${artist} | ${trackObj.uri}`);
+
+        // Check Manual Overrides
+        if (manualLyricsRef.current) {
+            log("Applying Session-Manual lyrics", "success");
+            setLyrics(manualLyricsRef.current);
+            lyricsRef.current = manualLyricsRef.current;
+            setStatus("Signal Active (Manual Session)");
+            setLoading(false);
+            return;
+        }
+
+        const persistentStore = getManualStore();
+        if (trackObj.uri && persistentStore[trackObj.uri]) {
+            log("Applying Persistent-Manual lyrics", "success");
+            setLyrics(persistentStore[trackObj.uri]);
+            lyricsRef.current = persistentStore[trackObj.uri];
+            setStatus("Signal Active (Manual Persistent)");
+            setLoading(false);
+            return;
+        }
         
         const getAppleMusicTTML = async () => {
             log("Resolving Apple Music mapping...");
@@ -169,10 +436,10 @@ const App = () => {
             // Layer 1: ISRC Search (Most Accurate)
             if (isrc) {
                 log(`Direct ISRC lookup: ${isrc}`);
+                const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
                 try {
-                    const searchUrl = `https://lyrics.paxsenix.org/apple-music/search?q=${isrc}`;
                     const res = await Spicetify.CosmosAsync.get(searchUrl, null, { 
-                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)',
+                        'User-Agent': 'Metrolist/13.4.0',
                         'Accept': 'application/json'
                     });
                     
@@ -196,7 +463,7 @@ const App = () => {
                 log("Trying Songlink mapping...");
                 try {
                     const songlinkUrl = `https://api.song.link/v1-alpha.1/links?url=spotify:track:${spotifyId}`;
-                    const slRes = await fetch(songlinkUrl).then(r => r.json());
+                    const slRes = await Spicetify.CosmosAsync.get(songlinkUrl);
                     const amEntity = slRes?.linksByPlatform?.appleMusic;
                     if (amEntity) {
                         amId = amEntity.entityUniqueId.split("::")[1];
@@ -216,7 +483,7 @@ const App = () => {
                 let searchRes;
                 try { 
                     searchRes = await Spicetify.CosmosAsync.get(searchUrl, null, { 
-                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)',
+                        'User-Agent': 'Metrolist/13.4.0',
                         'Accept': 'application/json'
                     });
                 } catch (e) {
@@ -258,7 +525,7 @@ const App = () => {
 
                 try {
                     const res = await Spicetify.CosmosAsync.get(lyricsUrl, null, { 
-                        'User-Agent': 'VaporLyricsExtension/1.1 (github.com/NaeNaeTart/VaporLyrics)'
+                        'User-Agent': 'Metrolist/13.4.0'
                     });
                     text = typeof res === 'string' ? res : (res.ttml || res.lyrics || res.data?.lyrics || JSON.stringify(res));
                     text = processAmResponse(text);
@@ -283,8 +550,14 @@ const App = () => {
         const getMusixmatchWord = async () => {
             log("Attempting Musixmatch (Paxsenix)...");
             const url = `https://lyrics.paxsenix.org/musixmatch/lyrics?t=${encodeURIComponent(cleanTitle)}&a=${encodeURIComponent(cleanArtist)}&type=word`;
+            let text = "";
             try {
-                const res = await fetch(url, { headers: { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' } });
+                const res = await fetch(url, { 
+                    headers: { 
+                        'User-Agent': 'Metrolist/13.4.0',
+                        'Accept': 'application/json'
+                    } 
+                });
                 if (!res.ok) throw new Error("MXM Fetch Error");
                 text = await res.text();
                 // Attempt to parse out if it returned a JSON escaped string or object
@@ -296,7 +569,10 @@ const App = () => {
                 } catch(e) {}
             } catch (e) {
                 // Fallback to CosmosAsync if CORS blocked native fetch
-                const res = await Spicetify.CosmosAsync.get(url, null, { 'User-Agent': 'Lyrically/1.0 (https://github.com/NaeNaeTart/VaporLyrics)' });
+                const res = await Spicetify.CosmosAsync.get(url, null, { 
+                    'User-Agent': 'Metrolist/13.4.0',
+                    'Accept': 'application/json'
+                });
                 text = typeof res === 'string' ? res : (res.lyrics || res.text || JSON.stringify(res));
             }
 
@@ -325,6 +601,26 @@ const App = () => {
             throw new Error("No LRCLIB match");
         };
 
+        const getLyricsOvh = async () => {
+            log("Attempting Lyrics.ovh...");
+            try {
+                const url = `https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtist)}/${encodeURIComponent(cleanTitle)}`;
+                const r = await fetch(url);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const res = await r.json();
+                if (res.lyrics) {
+                    const parsed = parseLRC(res.lyrics);
+                    if (parsed.length > 0) {
+                        log("Successfully parsed Lyrics.ovh", "success");
+                        return { parsed, source: "Lyrics.ovh" };
+                    }
+                }
+            } catch (e) {
+                log(`Lyrics.ovh failed: ${e}`, "warn");
+            }
+            throw new Error("No Lyrics.ovh match");
+        };
+
         const getNetEase = async () => {
             log("Attempting NetEase...");
             const searchUrl = `https://lyrics.paxsenix.org/netease/search?q=${encodeURIComponent(cleanArtist + " " + cleanTitle)}`;
@@ -347,32 +643,44 @@ const App = () => {
                     log("NetEase: No lyrics returned for this ID.", "warn");
                 }
                 
-                const parseYRC = (yrc: string): LyricLine[] => {
+            const parseYRC = (yrc: string): LyricLine[] => {
                 const parsed: LyricLine[] = [];
                 const lines = yrc.split('\n');
                 lines.forEach(line => {
                     const match = line.match(/\[(\d+),(\d+)\](.*)/);
                     if (match) {
-                        const startTime = parseInt(match[1]);
-                        const wordsRaw = match[3];
+                        const startTime = parseInt(match[1]!);
+                        const wordsRaw = match[3] || "";
                         const syllables: LyricSyllable[] = [];
                         let cleanWords = "";
-                        
-                        // YRC Word format: (start,duration,0)Word
                         const wordRegex = /\((\d+),(\d+),\d+\)([^\(]*)/g;
                         let wMatch;
                         while ((wMatch = wordRegex.exec(wordsRaw)) !== null) {
-                            const wordStart = parseInt(wMatch[1]);
-                            const wordText = wMatch[3];
+                            const wordStart = parseInt(wMatch[1]!);
+                            const wordText = wMatch[3] || "";
                             syllables.push({ startTime: startTime + wordStart, word: wordText });
                             cleanWords += wordText;
                         }
-                        
                         parsed.push({ 
                             startTime, 
                             words: syllables.length > 0 ? cleanWords : wordsRaw, 
                             syllables: syllables.length > 0 ? syllables : undefined 
                         });
+                    }
+                });
+                // Add end times
+                for (let i = 0; i < parsed.length; i++) {
+                    const cur = parsed[i]!;
+                    cur.endTime = i < parsed.length - 1 ? parsed[i+1]!.startTime : cur.startTime + 5000;
+                }
+                // Calculate syllable durations
+                parsed.forEach(line => {
+                    if (line.syllables) {
+                        for (let j = 0; j < line.syllables.length; j++) {
+                            const s = line.syllables[j]!;
+                            if (j < line.syllables.length - 1) s.duration = line.syllables[j+1]!.startTime - s.startTime;
+                            else s.duration = Math.max(200, (line.endTime || s.startTime + 1000) - s.startTime);
+                        }
                     }
                 });
                 return parsed;
@@ -429,28 +737,38 @@ const App = () => {
             const id = trackObj.uri?.split(":")[2];
             if (!id) throw new Error("No track ID");
             const url = `https://spotify-lyric-api-984e7b4face0.herokuapp.com/?trackid=${id}`;
-            const res = await fetch(url).then(r => r.json());
             
-            if (res && !res.error && (res.lines || res.lyrics?.lines)) {
-                const lines = res.lines || res.lyrics.lines;
-                const syncType = res.syncType || res.lyrics?.syncType;
-                const parsed: LyricLine[] = lines.map((l: any) => {
-                    const syllables = l.syllables ? l.syllables.map((s: any) => ({
-                        startTime: parseInt(s.startTimeMs || "0"),
-                        word: s.word || s.character || s.text || ""
-                    })) : undefined;
-                    return {
-                        startTime: parseInt(l.startTimeMs || "0"),
-                        words: l.words || "",
-                        syllables: syllables && syllables.length > 0 ? syllables : undefined
-                    };
-                });
-                if (parsed.length > 0) {
-                    return { 
-                        parsed, 
-                        source: syncType === "SYLLABLE_SYNCED" ? "Spotify Proxy Word-Sync" : "Spotify Proxy" 
-                    };
+            try {
+                const r = await fetch(url);
+                log(`Proxy Status: ${r.status}`);
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                const res = await r.json();
+                
+                if (res && !res.error && (res.lines || res.lyrics?.lines)) {
+                    const lines = res.lines || res.lyrics.lines;
+                    const syncType = res.syncType || res.lyrics?.syncType;
+                    const parsed: LyricLine[] = lines.map((l: any) => {
+                        const syllables = l.syllables ? l.syllables.map((s: any) => ({
+                            startTime: parseInt(s.startTimeMs || "0"),
+                            word: s.word || s.character || s.text || ""
+                        })) : undefined;
+                        return {
+                            startTime: parseInt(l.startTimeMs || "0"),
+                            words: l.words || "",
+                            syllables: syllables && syllables.length > 0 ? syllables : undefined
+                        };
+                    });
+                    if (parsed.length > 0) {
+                        return { 
+                            parsed, 
+                            source: syncType === "SYLLABLE_SYNCED" ? "Spotify Proxy Word-Sync" : "Spotify Proxy" 
+                        };
+                    }
+                } else if (res.error) {
+                    log(`Proxy API reported error: ${res.message || "Unknown"}`, "warn");
                 }
+            } catch (e) {
+                log(`Spotify Proxy Exception: ${e}`, "error");
             }
             throw new Error("Spotify Proxy failed");
         };
@@ -469,17 +787,18 @@ const App = () => {
             signalFound = true;
             setLyrics(res.parsed);
             lyricsRef.current = res.parsed;
-            setStatus(`Signal Active (${res.source})`);
+            setStatus(`Signal Active (${res.source}) [${res.parsed.length} lines]`);
             log(`Applied source: ${res.source}`, "success");
         };
 
         let fetchPromises = [
             getSpotify().then(applyLyrics).catch(() => {}),
+            getSpotifyProxy().then(applyLyrics).catch(() => {}),
             getAppleMusicTTML().then(applyLyrics).catch(() => {}),
             getMusixmatchWord().then(applyLyrics).catch(() => {}),
-            getSpotifyProxy().then(applyLyrics).catch(() => {}),
             getNetEase().then(applyLyrics).catch(() => {}),
-            getLrcLib().then(applyLyrics).catch(() => {})
+            getLrcLib().then(applyLyrics).catch(() => {}),
+            getLyricsOvh().then(applyLyrics).catch(() => {})
         ];
 
         Promise.allSettled(fetchPromises).then(() => {
@@ -493,55 +812,155 @@ const App = () => {
         });
     };
 
-    // Animation Loop (High-Frequency GPU Sync)
+    // Animation Loop — runs once, reads from refs, writes to DOM directly for perf
     useEffect(() => {
         let frame: number;
         const update = () => {
-            const currentTime = Spicetify.Player.getProgress();
+            const currentTime = Spicetify.Player.getProgress() + settingsRef.current.syncOffset;
             const lines = lyricsRef.current;
             
             if (lines.length > 0) {
-                let index = -1;
+                const currentActive: number[] = [];
                 for (let i = 0; i < lines.length; i++) {
-                    if (currentTime >= lines[i].startTime) index = i;
-                    else break;
+                    const line = lines[i]!;
+                    const endTime = line.endTime || (i < lines.length - 1 ? lines[i+1]!.startTime : line.startTime + 5000);
+                    if (currentTime >= line.startTime && currentTime < endTime) {
+                        currentActive.push(i);
+                    }
                 }
                 
-                if (index !== -1 && containerRef.current) {
-                    if (index !== activeIndex) {
-                        setActiveIndex(index);
-                        const activeEl = containerRef.current.children[index] as HTMLElement;
-                        if (activeEl) {
-                            const containerHeight = containerRef.current.parentElement?.clientHeight || 0;
-                            const offset = activeEl.offsetTop - (containerHeight / 2) + (activeEl.clientHeight / 2);
-                            setTransformY(-offset);
+                // Only trigger React re-render when active lines actually change
+                const prevActive = activeIndicesRef.current;
+                const changed = currentActive.length !== prevActive.length ||
+                                 currentActive.some((v, i) => v !== prevActive[i]);
+                if (changed) {
+                    activeIndicesRef.current = currentActive;
+                    setActiveIndices(currentActive);
+                }
+                
+                try {
+                    if (currentActive.length > 0 && containerRef.current) {
+                        const container = containerRef.current.parentElement;
+                        if (container && !isScrollingRef.current) {
+                            const containerHeight = container.clientHeight;
+                            let targetY: number | null = null;
+
+                            const isMulti = currentActive.length > 1;
+                            if (isMulti !== containerRef.current.classList.contains('multi-active')) {
+                                containerRef.current.classList.toggle('multi-active', isMulti);
+                            }
+
+                            if (currentActive.length === 1) {
+                                const el = containerRef.current.children[currentActive[0]!] as HTMLElement;
+                                if (el) targetY = -(el.offsetTop - (containerHeight / 2) + (el.clientHeight / 2));
+                            } else {
+                                const first = containerRef.current.children[currentActive[0]!] as HTMLElement;
+                                const last = containerRef.current.children[currentActive[currentActive.length-1]!] as HTMLElement;
+                                if (first && last) {
+                                    const middle = first.offsetTop + (last.offsetTop + last.clientHeight - first.offsetTop) / 2;
+                                    targetY = -(middle - (containerHeight / 2));
+                                }
+                            }
+
+                            if (targetY !== null && Math.abs(targetY - transformYRef.current) > 0.1) {
+                            const lerp = 0.12; 
+                            const smoothedY = transformYRef.current + (targetY - transformYRef.current) * lerp;
+                            transformYRef.current = smoothedY;
+                            userOffsetRef.current = smoothedY;
+                            containerRef.current.style.transform = `translate3d(0, ${smoothedY}px, 0)`;
+                        }
+                    }
+
+                    // Spicy Enhancements: Blurring and Syllable Progress
+                    const allLines = containerRef.current!.children;
+                    const primaryActiveIdx = currentActive.length > 0 ? currentActive[0]! : -1;
+                    
+                    for (let i = 0; i < allLines.length; i++) {
+                        const lineEl = allLines[i] as HTMLElement;
+                        if (!lineEl) continue;
+
+                        const dist = primaryActiveIdx >= 0 ? Math.abs(i - primaryActiveIdx) : 10;
+                        
+                        // Line Blurring & Scaling (Inspired by Spicy)
+                        if (currentActive.includes(i)) {
+                            lineEl.style.setProperty('--line-blur', '0px');
+                            lineEl.style.setProperty('--line-scale', '1.04');
+                        } else {
+                            const blurAmount = Math.min(dist * 1.5, 8);
+                            const scaleAmount = Math.max(0.85, 1 - dist * 0.03);
+                            lineEl.style.setProperty('--line-blur', `${blurAmount}px`);
+                            lineEl.style.setProperty('--line-scale', `${scaleAmount}`);
+                        }
+
+                        // Syllable Progress Logic
+                        if (currentActive.includes(i) && lineEl.classList.contains('word-synced')) {
+                            const spans = lineEl.querySelectorAll<HTMLElement>('.vapor-syllable');
+                            spans.forEach((span, sIdx) => {
+                                const stAttr = span.getAttribute('data-time');
+                                if (stAttr === null) return;
+                                
+                                const st = parseInt(stAttr);
+                                const nextSpan = spans[sIdx + 1];
+                                const et = nextSpan ? parseInt(nextSpan.getAttribute('data-time') || "0") : (st + 800);
+                                
+                                if (currentTime >= st) {
+                                    span.classList.add('synced');
+                                    if (currentTime < et) {
+                                        // Current active syllable
+                                        const duration = Math.max(1, et - st);
+                                        const progress = Math.min(100, Math.max(0, ((currentTime - st) / duration) * 100));
+                                        span.style.setProperty('--gradient-pos', `${progress}%`);
+                                        span.classList.add('active-syllable');
+                                    } else {
+                                        span.style.setProperty('--gradient-pos', '100%');
+                                        span.classList.remove('active-syllable');
+                                    }
+                                } else {
+                                    span.classList.remove('synced', 'active-syllable');
+                                    span.style.setProperty('--gradient-pos', '0%');
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    // Fallback cleanup when no lines are active or container missing
+                    if (containerRef.current) {
+                        const allLines = containerRef.current.children;
+                        for (let i = 0; i < allLines.length; i++) {
+                            const lineEl = allLines[i] as HTMLElement;
+                            if (lineEl) {
+                                lineEl.style.setProperty('--line-blur', '0px');
+                                lineEl.style.setProperty('--line-scale', '1');
+                            }
                         }
                     }
                     
-                    const activeEl = containerRef.current.children[index] as HTMLElement;
-                    if (activeEl && activeEl.classList.contains('word-synced')) {
-                        const spans = activeEl.querySelectorAll('.vapor-syllable');
-                        spans.forEach(span => {
-                            const st = parseInt(span.getAttribute('data-time') || "0");
-                            if (currentTime >= st) span.classList.add('synced');
-                            else span.classList.remove('synced');
-                        });
+                    if (isScrollingRef.current) {
+                        if (Math.abs(userOffsetRef.current - transformYRef.current) > 0.5) {
+                            transformYRef.current = userOffsetRef.current;
+                            setTransformY(userOffsetRef.current);
+                        }
                     }
                 }
+            } catch (err) {
+                console.error("[Vapor] Animation loop threw an error:", err);
             }
+            }
+            
             frame = requestAnimationFrame(update);
         };
         frame = requestAnimationFrame(update);
         return () => cancelAnimationFrame(frame);
-    }, [activeIndex]);
+    }, []); // Runs once — reads all state via refs
 
     useEffect(() => {
         const handleUpdate = (event?: any, force = false) => {
             const uri = Spicetify.Player.data?.track?.uri || Spicetify.Player.track?.uri || "unknown";
             if (force || event || (uri !== trackRef.current)) {
                 trackRef.current = uri;
-                setActiveIndex(-1);
+                setActiveIndices([]);
                 setTransformY(0);
+                transformYRef.current = 0;
                 fetchLyrics();
             }
         };
@@ -564,81 +983,192 @@ const App = () => {
     }, []);
 
     useEffect(() => {
-        if (canvasRef.current && !kawarpRef.current) {
-            kawarpRef.current = new KawarpCore(canvasRef.current);
-            kawarpRef.current.start();
-        }
-        return () => {
+        if (!canvasRef.current) return;
+        
+        if (settings.visualEffect === "kawarp") {
+            if (!kawarpRef.current) {
+                kawarpRef.current = new KawarpCore(canvasRef.current);
+                kawarpRef.current.start();
+            }
+            if (coverArt) {
+                kawarpRef.current.loadImage(coverArt).catch((e: any) => console.log("Kawarp load error:", e));
+            }
+        } else {
             if (kawarpRef.current) {
                 kawarpRef.current.dispose();
                 kawarpRef.current = null;
             }
-        };
-    }, []);
-
-    useEffect(() => {
-        if (kawarpRef.current && coverArt) {
-            kawarpRef.current.loadImage(coverArt).catch((e: any) => console.log("Kawarp load error:", e));
         }
-    }, [coverArt]);
+    }, [settings.visualEffect, coverArt]);
+
+    const isWordSynced = lyrics.some(l => l.syllables && l.syllables.length > 0);
+    const effectiveAlign = isWordSynced ? "center" : settings.textAlign;
 
     return React.createElement("div", { 
         id: "vapor-lyrics-app-container",
         style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", overflow: "hidden", zIndex: 100 }
     }, [
-        React.createElement("div", { className: "vapor-background", key: "bg" }, [
+        React.createElement("div", { 
+            className: `vapor-background ${settings.visualEffect === "static" ? "static-cover" : ""}`, 
+            key: "bg",
+            style: settings.visualEffect === "static" ? { backgroundImage: `url(${coverArt})` } : {} 
+        }, [
             React.createElement("canvas", { 
                 key: "canvas", 
                 ref: canvasRef, 
-                style: { width: "100%", height: "100%", position: "absolute", top: 0, left: 0 } 
+                style: { 
+                    width: "100%", 
+                    height: "100%", 
+                    position: "absolute", 
+                    top: 0, 
+                    left: 0,
+                    display: settings.visualEffect === "kawarp" ? "block" : "none"
+                } 
             })
         ]),
         React.createElement("div", { className: "vapor-content", key: "content" }, [
-            React.createElement("header", { className: "vapor-header", key: "header" }, [
+            settings.showHeader && React.createElement("header", { className: "vapor-header", key: "header" }, [
                 React.createElement("h1", { className: "vapor-title", key: "title" }, "ＶＡＰＯＲ  ＬＹＲＩＣＳ")
             ]),
-            React.createElement("main", { className: "vapor-lyrics-container", key: "main" }, [
+            React.createElement("main", { 
+                className: "vapor-lyrics-container", 
+                key: "main",
+                onWheel: (e: any) => {
+                    isScrollingRef.current = true;
+                    userOffsetRef.current -= Number(e.deltaY) * 0.8;
+                    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+                    scrollTimeoutRef.current = setTimeout(() => {
+                        isScrollingRef.current = false;
+                    }, 4000);
+                },
+                onMouseDown: (e: any) => {
+                    isScrollingRef.current = true;
+                    const startY = e.clientY;
+                    const startOffset = userOffsetRef.current;
+                    
+                    const onMouseMove = (moveEvent: any) => {
+                        userOffsetRef.current = startOffset + (moveEvent.clientY - startY);
+                    };
+                    const onMouseUp = () => {
+                        window.removeEventListener("mousemove", onMouseMove);
+                        window.removeEventListener("mouseup", onMouseUp);
+                        if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+                        scrollTimeoutRef.current = setTimeout(() => {
+                            isScrollingRef.current = false;
+                        }, 4000);
+                    };
+                    window.addEventListener("mousemove", onMouseMove);
+                    window.addEventListener("mouseup", onMouseUp);
+                }
+            }, [
                 React.createElement("div", { 
                     className: "vapor-lyrics-scroll", 
                     key: "scroll", 
                     ref: containerRef,
-                    style: { transform: `translate3d(0, ${transformY}px, 0)` }
+                    style: { 
+                        textAlign: "center",
+                        alignItems: "stretch",
+                        padding: "50vh 3rem"
+                    }
                 }, 
                     loading 
-                    ? [React.createElement("p", { className: "vapor-lyric-line active", key: "l" }, "Establishing aesthetic uplink...")]
+                    ? [React.createElement("p", { className: "vapor-lyric-line v-active", key: "l" }, "Establishing aesthetic uplink...")]
                     : lyrics.length > 0
                     ? lyrics.map((line, i) => {
-                        const durationMs = i < lyrics.length - 1 ? lyrics[i+1].startTime - line.startTime : 3000;
+                        const nextLine = lyrics[i+1];
+                        const durationMs = nextLine ? nextLine.startTime - line.startTime : (line.endTime ? (line.endTime - line.startTime) : 3000);
                         let stateClass = "";
-                        if (i === activeIndex) stateClass = "active";
-                        else if (activeIndex !== -1 && i < activeIndex) stateClass = "played";
+                        if (activeIndices.includes(i)) stateClass = "v-active";
+                        else if (activeIndices.length > 0 && i < activeIndices[0]!) stateClass = "v-played";
 
                         const hasSyllables = line.syllables && line.syllables.length > 0;
+                        const role = line.role || "main";
+                        const agent = line.agent || "v1";
+                        
+                        let lineAlign: "left" | "right" | "center" = "left";
+                        if (role === "background") {
+                            lineAlign = "right";
+                        } else {
+                            // Agent-based positioning: v1=Left, v2=Right, others shared/center
+                            if (agent === "v1") lineAlign = "left";
+                            else if (agent === "v2") lineAlign = "right";
+                            else lineAlign = "center";
+                        }
                         
                         return React.createElement("p", { 
-                            className: `vapor-lyric-line ${stateClass} ${hasSyllables ? "word-synced" : ""}`, 
+                            className: `vapor-lyric-line ${stateClass} ${hasSyllables ? "word-synced" : ""} role-${role} agent-${agent}`, 
                             key: i,
-                            style: { "--line-duration": `${durationMs}ms` } as any
+                            style: { 
+                                "--line-duration": `${durationMs}ms`,
+                                fontSize: `${2.2 * settings.fontScale}rem`,
+                                textAlign: lineAlign,
+                                alignSelf: lineAlign === "left" ? "flex-start" : (lineAlign === "right" ? "flex-end" : "center"),
+                                transformOrigin: lineAlign
+                            } as any
                         }, hasSyllables 
-                            ? line.syllables!.map((s, idx) => React.createElement("span", {
-                                className: "vapor-syllable",
-                                key: idx,
-                                "data-time": s.startTime
-                              }, s.word))
-                            : line.words)
+                            ? line.syllables!.map((s, idx) => {
+                                // Add a trailing space if the next syllable doesn't start with a space
+                                // This fix handles "bunched up" syllables in many TTML/LRC sources
+                                // But we skip it if the word ends with a hyphen (split syllable)
+                                let word = s.word;
+                                if (!word.endsWith(" ") && !word.endsWith("-") && idx < line.syllables!.length - 1) {
+                                    const nextSyl = line.syllables![idx + 1];
+                                    if (nextSyl && !nextSyl.word.startsWith(" ") && !nextSyl.word.startsWith("-")) {
+                                        word += " ";
+                                    }
+                                }
+                                
+                                return React.createElement("span", {
+                                    className: `vapor-syllable ${stateClass === "v-played" ? "synced" : ""}`,
+                                    key: idx,
+                                    "data-time": s.startTime,
+                                    style: { "--syl-duration": `${s.duration || 400}ms` } as any
+                                }, word);
+                            })
+                            : line.words);
                     })
-                    : [React.createElement("p", { className: "vapor-lyric-line", key: "i" }, status === "Establishing signal..." ? "Initializing signal..." : status)]
+                    : [React.createElement("div", { 
+                        key: "no-lyrics", 
+                        style: { 
+                            display: "flex", flexDirection: "column", alignItems: "center",
+                            gap: "12px", opacity: 0.4, paddingTop: "6vh"
+                        } 
+                    }, [
+                        React.createElement("div", { 
+                            key: "icon", 
+                            style: { fontSize: "3rem" } 
+                        }, "♩"),
+                        React.createElement("p", { 
+                            key: "msg", 
+                            className: "vapor-lyric-line",
+                            style: { margin: 0, fontSize: "1.2rem", fontWeight: 500 }
+                        }, status.startsWith("Establishing") ? "Searching for lyrics..." : "No lyrics available for this track"),
+                        status.includes("Signal Active") === false && React.createElement("p", {
+                            key: "sub",
+                            style: { fontSize: "0.75rem", opacity: 0.6, margin: 0, fontFamily: "monospace", letterSpacing: "1px" }
+                        }, status)
+                    ])]
                 )
             ]),
             React.createElement("div", { 
-                className: "vapor-debug-status", 
-                key: "st",
-                onClick: () => setShowDebug(!showDebug)
+                className: "floating-controls",
+                key: "controls"
             }, [
-                React.createElement("span", { key: "s" }, status),
-                React.createElement("span", { key: "h", style: { opacity: 0.5, marginLeft: 8 } }, "(Click for Debug)")
+                settings.devMode && React.createElement("div", { 
+                    className: "vapor-debug-status", 
+                    key: "st",
+                    onClick: () => setShowDebug(!showDebug)
+                }, [
+                    React.createElement("span", { key: "s" }, status),
+                    React.createElement("span", { key: "h", style: { opacity: 0.5, marginLeft: 8 } }, "(Click for Debug)")
+                ]),
+                React.createElement("div", {
+                    className: "vapor-settings-toggle",
+                    key: "sett",
+                    onClick: () => setShowSettings(!showSettings)
+                }, "⚙")
             ]),
-            showDebug && React.createElement("div", { 
+            settings.devMode && showDebug && React.createElement("div", { 
                 className: "vapor-debug-overlay", 
                 key: "dbg",
                 onClick: (e: any) => e.stopPropagation()
@@ -662,6 +1192,142 @@ const App = () => {
                 React.createElement("div", { className: "debug-list", key: "l" }, 
                     debugLogs.map((log, i) => React.createElement("div", { key: i, className: "debug-line" }, log))
                 )
+            ]),
+            showSettings && React.createElement("div", {
+                className: "vapor-settings-overlay",
+                key: "set-over",
+                onClick: (e: any) => e.stopPropagation()
+            }, [
+                React.createElement("header", { key: "h" }, [
+                    React.createElement("h2", { key: "t" }, "System Configuration"),
+                    React.createElement("button", { key: "b", onClick: () => setShowSettings(false) }, "✖")
+                ]),
+                React.createElement("div", { className: "settings-content", key: "c" }, [
+                    // Sync Offset
+                    React.createElement("div", { className: "setting-item", key: "sync" }, [
+                        React.createElement("label", { key: "l" }, `Sync Offset: ${settings.syncOffset}ms`),
+                        React.createElement("input", { 
+                            key: "i", 
+                            type: "range", 
+                            min: -2000, 
+                            max: 2000, 
+                            step: 50,
+                            value: settings.syncOffset,
+                            onChange: (e: any) => setSettings({ ...settings, syncOffset: parseInt(e.target.value) })
+                        })
+                    ]),
+                    // Font Scale
+                    React.createElement("div", { className: "setting-item", key: "font" }, [
+                        React.createElement("label", { key: "l" }, `Font Scale: ${settings.fontScale.toFixed(1)}x`),
+                        React.createElement("input", { 
+                            key: "i", 
+                            type: "range", 
+                            min: 0.5, 
+                            max: 2.0, 
+                            step: 0.1,
+                            value: settings.fontScale,
+                            onChange: (e: any) => setSettings({ ...settings, fontScale: parseFloat(e.target.value) })
+                        })
+                    ]),
+                    // Text Align
+                    React.createElement("div", { className: "setting-item", key: "align" }, [
+                        React.createElement("label", { key: "l" }, "Line-Sync Alignment"),
+                        React.createElement("div", { className: "button-group", key: "g" }, 
+                            ["left", "center", "right"].map(a => React.createElement("button", {
+                                key: a,
+                                className: settings.textAlign === a ? "active" : "",
+                                onClick: () => setSettings({ ...settings, textAlign: a as any })
+                            }, a.toUpperCase()))
+                        )
+                    ]),
+                    // Visual Effect
+                    React.createElement("div", { className: "setting-item", key: "vis" }, [
+                        React.createElement("label", { key: "l" }, "Visual Uplink"),
+                        React.createElement("div", { className: "button-group", key: "g" }, 
+                            ["kawarp", "static", "none"].map(v => React.createElement("button", {
+                                key: v,
+                                className: settings.visualEffect === v ? "active" : "",
+                                onClick: () => setSettings({ ...settings, visualEffect: v as any })
+                            }, v.toUpperCase()))
+                        )
+                    ]),
+                    // Toggles
+                    React.createElement("div", { className: "setting-item toggle", key: "dbg-start" }, [
+                        React.createElement("label", { key: "l" }, "Auto-show Debug Terminal"),
+                        React.createElement("input", { 
+                            key: "i", 
+                            type: "checkbox",
+                            checked: settings.showDebugOnStart,
+                            onChange: (e: any) => setSettings({ ...settings, showDebugOnStart: e.target.checked })
+                        })
+                    ]),
+                    React.createElement("div", { className: "setting-item toggle", key: "show-hdr" }, [
+                        React.createElement("label", { key: "l" }, "Show Header Title"),
+                        React.createElement("input", { 
+                            key: "i", 
+                            type: "checkbox",
+                            checked: settings.showHeader,
+                            onChange: (e: any) => setSettings({ ...settings, showHeader: e.target.checked })
+                        })
+                    ]),
+                    React.createElement("div", { className: "setting-item toggle", key: "dev-mode" }, [
+                        React.createElement("label", { key: "l" }, "Developer Mode"),
+                        React.createElement("input", { 
+                            key: "i", 
+                            type: "checkbox",
+                            checked: settings.devMode,
+                            onChange: (e: any) => setSettings({ ...settings, devMode: e.target.checked })
+                        })
+                    ]),
+                    settings.devMode && React.createElement("div", {
+                        key: "import-tools",
+                        style: { display: "flex", flexDirection: "column", gap: "8px", border: "1px solid rgba(255,255,255,0.1)", padding: "10px", borderRadius: "8px", marginBottom: "10px" }
+                    }, [
+                        React.createElement("p", { key: "t", style: { margin: "0 0 5px 0", fontSize: "12px", opacity: 0.7 } }, "Aesthetic Uplink Tools"),
+                        React.createElement("button", {
+                            key: "import-f",
+                            className: "dev-button",
+                            style: { background: "rgba(255,255,255,0.1)", color: "#fff", border: "1px solid rgba(255,255,255,0.2)", padding: "8px", cursor: "pointer", display: "block" },
+                            onClick: () => {
+                                const input = document.createElement("input");
+                                input.type = "file";
+                                input.accept = ".ttml,.xml,.lrc,.txt";
+                                input.onchange = async () => {
+                                    const file = input.files?.[0];
+                                    if (!file) return;
+                                    const text = await file.text();
+                                    const parsed = file.name.endsWith(".ttml") || file.name.endsWith(".xml") ? parseTTML(text) : parseLRC(text);
+                                    
+                                    if (parsed.length > 0) {
+                                        const persistent = confirm("Make this persistent for this song?");
+                                        if (persistent) {
+                                            const uri = trackRef.current || Spicetify.Player.data?.track?.uri;
+                                            if (uri) saveManualLyric(uri, parsed);
+                                            else alert("Error: No track URI found.");
+                                        } else {
+                                            manualLyricsRef.current = parsed;
+                                        }
+                                        setLyrics(parsed);
+                                        lyricsRef.current = parsed;
+                                        setStatus("Manual Uplink Established");
+                                    } else {
+                                        alert("Failed to extract lyrics from file.");
+                                    }
+                                };
+                                input.click();
+                            }
+                        }, "IMPORT LYRIC FILE")
+                    ]),
+                    React.createElement("button", {
+                        key: "reset",
+                        className: "reset-button",
+                        onClick: () => {
+                            if (confirm("Reset all settings to defaults?")) {
+                                setSettings(DEFAULT_SETTINGS);
+                            }
+                        }
+                    }, "FACTORY RESET")
+                ])
             ])
         ])
     ]);

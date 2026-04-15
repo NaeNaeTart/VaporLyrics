@@ -40,3 +40,6 @@ openapi.json
 test.json
 index.js
 parser-rs/target/
+
+# test files
+*.ttml
